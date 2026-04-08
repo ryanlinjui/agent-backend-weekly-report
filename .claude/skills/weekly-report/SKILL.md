@@ -41,7 +41,7 @@ Let:
 - `W_start` = (current UTC timestamp) − 7 days, formatted as `YYYY-MM-DD`
 - `W_end` = current UTC timestamp, formatted as `YYYY-MM-DD`
 
-Remember `W_start` and `W_end` — you will substitute them into Step 3 commands and Step 6 output.
+Remember `W_start` and `W_end` — you will substitute them into Step 3 commands, Step 6 output, and the Step 8 send command.
 
 ### Step 3: Fetch raw GitHub activity via Bash
 
@@ -81,7 +81,7 @@ Read the file `references/report-template.md` (relative to this SKILL.md). It is
 
 Compose the report following the template. Rules:
 
-1. **Grounding (critical):** You may only reference issues, PRs, commits, repo names, titles, and URLs that appear verbatim in the Step 3 raw output. Every bullet must trace to raw data. If a field is missing, omit the bullet. **Do not invent anything. An empty section is always preferable to a fabricated one.**
+1. **Grounding (critical):** You may only reference issues, PRs, commits, repo names, titles, and URLs that appear verbatim in the Step 3 raw output. Every bullet must trace to raw data. **The TL;DR is also bound by this rule — you may only characterize work that is represented in the raw data. Do not invent claims about focus areas, themes, impact, or week-level narrative that cannot be traced to the fetched items.** If a field is missing, omit the bullet. **Do not invent anything. An empty section is always preferable to a fabricated one.**
 2. **TL;DR is always present.** 2–3 sentences summarizing the week's focus and outputs.
 3. **`🚀 Shipped`** = merged PRs + closed issues from the raw data. Omit the entire section if there are none.
 4. **`🛠 In Progress`** = open PRs + open issues. Omit the entire section if there are none.
@@ -130,7 +130,7 @@ Then WAIT for the user's reply. Do not proceed until they respond.
 
 ### Step 8: Send
 
-Write the current draft markdown to a temp file:
+**Use the Write tool** (NOT `echo`/heredoc via Bash — those will corrupt markdown that contains backticks, dollar signs, or quotes) to write the current draft markdown to this temp file path:
 
 ```
 /tmp/weekly-report-{W_end}.md
