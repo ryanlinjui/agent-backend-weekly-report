@@ -1,20 +1,35 @@
 ---
 name: weekly-report
-description: Generate and send a weekly report email summarizing the producer's GitHub activity (PRs, issues, commits) from the past 7 days. Use when the user asks for "weekly report", "週報", "my week in review", or similar. Drafts the email against a fixed template, shows it in chat for explicit approval, and only sends after the user picks "送出".
+description: Generate and send a weekly report summarizing the producer's activity across GitHub, Slack, and Notion. Delivers via Email (Gmail) and LINE. Use when the user asks for "weekly report", "週報", "my week in review", or similar. Drafts the report against a fixed template, shows it in chat for explicit approval, and only sends after the user picks "送出".
 ---
 
 # Weekly Report Skill
 
-Produce a weekly report of Ryan's GitHub activity for the last 7 days and send it via Mail.app to a fixed recipient, with a mandatory approval gate in Claude Code chat before any email is sent.
+Produce a weekly report of the producer's activity across GitHub, Slack, and Notion, then deliver via Email and LINE. Mandatory approval gate in Claude Code chat before anything is sent.
 
-## Hardcoded configuration
+## Configuration
 
-These values are fixed for MVP:
+All settings are read from the `.env` file at the project root. **Nothing is hardcoded.** These values are set during `/weekly-report-init`.
 
-- **Producer GitHub username:** `ryanlinjui`
-- **From (sender):** `a02733613424@gmail.com` (via Playwright driving Gmail web)
-- **To (recipient):** `ryanlinjui@gmail.com`
-- **Window:** last 7 days, ending at the current UTC timestamp
+### Step 0: Load configuration
+
+Read the `.env` file using the Read tool. Extract these values into working memory:
+
+| Variable | Purpose |
+|---|---|
+| `GITHUB_USERNAME` | GitHub user to query PRs/issues/commits |
+| `REPORT_RECIPIENTS` | Comma-separated email addresses |
+| `REPORT_WINDOW_DAYS` | Number of days to look back (default: 7) |
+| `GMAIL_USER` | Gmail account for Playwright email sending |
+| `SLACK_BOT_TOKEN` | Slack API token for reading channels |
+| `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API token |
+| `LINE_RECIPIENT_IDS` | Comma-separated LINE user IDs |
+
+If `.env` is missing or critical values are empty, print:
+```
+❌ Configuration not found. Run /weekly-report-init first.
+```
+…and STOP.
 
 ## Pipeline — run these steps IN ORDER
 
@@ -32,127 +47,170 @@ If exit code is non-zero, or stderr mentions `not logged in`, print:
 ❌ gh not authenticated. Run 'gh auth login' and retry.
 ```
 
-…and STOP. Do not continue to Step 2.
+…and STOP.
 
 ### Step 2: Compute the window
 
 Let:
 
-- `W_start` = (current UTC timestamp) − 7 days, formatted as `YYYY-MM-DD`
+- `W_start` = (current UTC timestamp) − `REPORT_WINDOW_DAYS` days, formatted as `YYYY-MM-DD`
 - `W_end` = current UTC timestamp, formatted as `YYYY-MM-DD`
 
-Remember `W_start` and `W_end` — you will substitute them into Step 3 commands, Step 6 output, and the Step 8 send command.
+Remember `W_start` and `W_end` for all subsequent steps.
 
-### Step 3: Fetch raw GitHub activity via Bash
+### Step 3: Fetch raw data from ALL sources
 
-Run these three commands. **Keep the raw JSON output in your working memory — do not summarize or drop fields yet.** Substitute `{W_start}` with the value from Step 2.
+Fetch from three sources in order. **Keep all raw output in working memory — do not summarize yet.**
 
-```
-gh search prs --author=ryanlinjui --updated=">={W_start}" --json repository,number,title,state,url,updatedAt --limit 50
-```
+If any source fails, print a warning and continue to the next source. The report will note which sources were unavailable. Only STOP if ALL sources fail.
 
-```
-gh search issues --author=ryanlinjui --updated=">={W_start}" --json repository,number,title,state,url,updatedAt --limit 50
-```
+#### 3a: GitHub
 
-```
-gh api "search/commits?q=author:ryanlinjui+committer-date:>={W_start}" -H "Accept: application/vnd.github.cloak-preview+json"
-```
+Read and follow `references/fetch-github.md` — but substitute `{GITHUB_USERNAME}` with the value from `.env` (not hardcoded).
 
-**Fallback** if the `gh api search/commits` call fails with a rate-limit error (HTTP 403 or body `{"message": "API rate limit ..."}`) or a preview-API error:
+Summary of GitHub queries (substitute `{GITHUB_USERNAME}` and `{W_start}`):
 
 ```
-gh repo list --limit 100 --json nameWithOwner
+gh search prs --author={GITHUB_USERNAME} --updated=">={W_start}" --json repository,number,title,state,url,updatedAt --limit 50
 ```
 
-Then for each `<owner>/<repo>` returned:
-
 ```
-gh api "repos/<owner>/<repo>/commits?author=ryanlinjui&since={W_start}"
+gh search issues --author={GITHUB_USERNAME} --updated=">={W_start}" --json repository,number,title,state,url,updatedAt --limit 50
 ```
 
-If the fallback also fails, print the error verbatim and STOP. Do not draft on partial data.
+```
+gh api "search/commits?q=author:{GITHUB_USERNAME}+committer-date:>={W_start}" -H "Accept: application/vnd.github.cloak-preview+json"
+```
+
+Fallback for commits: `gh repo list --limit 100 --json nameWithOwner` then per-repo `gh api repos/<owner>/<repo>/commits?author={GITHUB_USERNAME}&since={W_start}`.
+
+#### 3b: Slack
+
+Read and follow `references/fetch-slack.md`.
+
+Use Bash with `curl` and `SLACK_BOT_TOKEN` to fetch the producer's messages from team channels in the report window. If `SLACK_BOT_TOKEN` is empty, skip with a warning.
+
+#### 3c: Notion
+
+Read and follow `references/fetch-notion.md`.
+
+Use Notion MCP tools (`mcp__plugin_Notion_notion__notion-search`, `mcp__plugin_Notion_notion__notion-fetch`) to find and read meeting notes from the report window. If Notion MCP is not connected, skip with a warning.
 
 ### Step 4: Read the template
 
-Read the file `references/report-template.md` (relative to this SKILL.md). It is your output structure. You MUST follow its sections, order, and emojis exactly.
+Read `references/report-template.md`. Follow its sections, order, and emojis exactly.
 
 ### Step 5: Draft the report
 
 Compose the report following the template. Rules:
 
-1. **Grounding (critical):** You may only reference issues, PRs, commits, repo names, titles, and URLs that appear verbatim in the Step 3 raw output. Every bullet must trace to raw data. **The TL;DR is also bound by this rule — you may only characterize work that is represented in the raw data. Do not invent claims about focus areas, themes, impact, or week-level narrative that cannot be traced to the fetched items.** If a field is missing, omit the bullet. **Do not invent anything. An empty section is always preferable to a fabricated one.**
-2. **TL;DR is always present.** 2–3 sentences summarizing the week's focus and outputs.
-3. **`🚀 Shipped`** = merged PRs + closed issues from the raw data. Omit the entire section if there are none.
-4. **`🛠 In Progress`** = open PRs + open issues. Omit the entire section if there are none.
-5. **`📌 Other Activity`** = OPTIONAL. Include only if there are direct commits (from Step 3 commits query) that are not tied to a listed PR and are worth mentioning. Omit otherwise.
-6. **Empty window:** if Step 3 returned zero items across all three queries, TL;DR says exactly `本週無 GitHub activity。` and all other sections are omitted.
-7. Replace `{START_DATE}` and `{END_DATE}` in the template with the actual `W_start` and `W_end` ISO dates.
+1. **Grounding (critical):** You may only reference items that appear verbatim in the Step 3 raw output (from ANY source — GitHub, Slack, or Notion). Every bullet must trace to raw data. **The TL;DR is also bound by this rule — do not invent claims about focus areas, themes, impact, or narrative that cannot be traced to fetched items.** If a field is missing, omit the bullet. **Do not invent anything. An empty section is always preferable to a fabricated one.**
+2. **TL;DR is always present.** 2–3 sentences summarizing the week, drawing from all available sources.
+3. **`🚀 Shipped`** = merged PRs + closed issues (from GitHub). Omit if none.
+4. **`🛠 In Progress`** = open PRs + open issues (from GitHub). Omit if none.
+5. **`📌 Other Activity`** = OPTIONAL. Include notable items from Slack messages, Notion meeting notes, or direct commits not tied to PRs. Omit if nothing worth noting.
+6. **Source attribution:** When citing Slack or Notion content, note the source (e.g., "discussed in #general", "per 4/7 Scrum Meeting notes").
+7. **Empty window:** if all sources returned zero items, TL;DR says `本週無活動紀錄。` and all other sections are omitted.
+8. Replace `{START_DATE}` and `{END_DATE}` in the template with `W_start` and `W_end`.
+9. **Source availability note:** If any source was skipped (Slack token missing, Notion MCP disconnected), add a line at the bottom: `⚠️ Note: {source} data was unavailable for this report.`
 
 ### Step 6: Show the approval gate
 
-Print this block verbatim in the chat, substituting `{W_start}`, `{W_end}`, and `<FULL DRAFT MARKDOWN HERE>` with the real values:
+Print this block in chat, substituting real values:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📧 Weekly Report — {W_start} to {W_end}
 
-From: a02733613424@gmail.com
-To:   ryanlinjui@gmail.com
+From: {GMAIL_USER}
+To:   {REPORT_RECIPIENTS}
+LINE: {LINE_RECIPIENT_IDS or "not configured"}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-<FULL DRAFT MARKDOWN HERE>
+<FULL DRAFT HERE>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 請選擇：
-  [1] 送出
-  [2] 修改（告訴我改哪裡，例如「把 TL;DR 第二句拿掉」)
-  [3] 重新生成（同 data，重做 draft)
+  [1] 送出（Email + LINE）
+  [2] 修改（告訴我改哪裡）
+  [3] 重新生成（同 data，重做 draft）
   [4] 取消
 ```
 
-Then WAIT for the user's reply. Do not proceed until they respond.
+Then WAIT for the user's reply.
 
 ### Step 7: Handle the user's choice
 
-| Input                                       | Action |
+| Input | Action |
 |---|---|
-| `1` / `送出` / `send` / `yes`                | Go to Step 8 (send) |
-| `2 <instruction>` / `修改 <instruction>`     | Apply the natural-language edit to the draft, then go back to Step 6 (reprint the approval gate) |
-| bare `2` / bare `修改` (no instruction)      | Ask `要改什麼？`, wait for the user's reply, apply, then go back to Step 6 |
-| `3` / `重新生成`                              | Re-draft from the **same raw data from Step 3** (do NOT re-run the `gh` commands), then go back to Step 6 |
-| `4` / `取消` / `cancel` / `no`               | Print `❌ Cancelled. No email sent.` and STOP |
-| `dry run` / `dry-run`                        | Go to Step 8, but append `--dry-run` to the `send_mail.py` call. After the dry-run output prints, return to Step 6 so the user can still choose to really send |
-| anything else                                | Print `我不確定你的意思 — 請選 1/2/3/4 或告訴我你想改什麼。` and WAIT again |
+| `1` / `送出` / `send` / `yes` | Go to Step 8 |
+| `2 <instruction>` / `修改 <instruction>` | Apply edit → reprint Step 6 |
+| bare `2` / bare `修改` | Ask `要改什麼？` → wait → apply → reprint Step 6 |
+| `3` / `重新生成` | Re-draft from same raw data (no re-fetch) → reprint Step 6 |
+| `4` / `取消` / `cancel` / `no` | Print `❌ Cancelled.` → STOP |
+| `dry run` / `dry-run` | Print the draft that would be sent, then return to Step 6 |
+| anything else | Print `我不確定你的意思 — 請選 1/2/3/4 或告訴我你想改什麼。` → WAIT |
 
 **CRITICAL:** never auto-select option 1. When in doubt, ask.
 
-### Step 8: Send
+### Step 8: Send to ALL configured channels
 
-Use the **Playwright MCP tools** to send the email via Gmail web. This is cross-platform (no macOS dependency) and doesn't require SMTP credentials or App Passwords.
+Send the approved report to every configured output channel. Each channel is independent — if one fails, continue to the next.
 
-If the user chose `dry run` in Step 7, **skip this entire step** — just print the draft and return to Step 6. Do not open the browser.
+#### 8a: Email via Playwright Gmail
 
-**Playwright send sequence:**
+Read and follow `references/send-gmail.md` (below).
+
+Use **Playwright MCP tools** to send via Gmail web:
 
 1. `browser_navigate` → `https://mail.google.com/mail/u/0/#inbox?compose=new`
-2. Wait for the compose window to appear (use `browser_snapshot` to confirm)
-3. `browser_type` into the **To** field → `ryanlinjui@gmail.com` (then press Enter to confirm the recipient)
-4. `browser_type` into the **Subject** field → `Weekly Report — {W_start} to {W_end}`
-5. `browser_type` into the **Message Body** field → the clean plain-text version of the draft (strip markdown syntax: no `#`, `**`, or `-` bullets — use the same format shown in the approval gate)
-6. `browser_click` the **Send** button
+2. Wait for compose window (`browser_snapshot` to confirm)
+3. `browser_type` To → each address from `REPORT_RECIPIENTS` (press Enter after each)
+4. `browser_type` Subject → `Weekly Report — {W_start} to {W_end}`
+5. `browser_type` Body → the clean plain-text version of the draft
+6. `browser_click` Send
 
-On **successful send** (compose window closes, back to inbox): print `✅ Sent to ryanlinjui@gmail.com via Gmail`
+On success: print `✅ Email sent to {REPORT_RECIPIENTS}`
+On failure: print error + `❌ Email send failed.`
 
-On **failure** (compose window still open, or error): take a `browser_snapshot`, print the error, and `❌ Send failed. Draft preserved — you can try again.` Leave the draft in conversation context so the user can ask you to retry.
+**Important:** `GMAIL_USER` must be logged in on the Playwright browser. If Gmail shows a login page, tell the user to log in and retry.
 
-**Important:** The Gmail account `a02733613424@gmail.com` must already be logged in on the Playwright browser. If Gmail shows a login page instead of the inbox, tell the user to log in manually and retry.
+#### 8b: LINE via Messaging API
+
+Read and follow `references/send-line.md`.
+
+For each user ID in `LINE_RECIPIENT_IDS`, use Bash with `curl`:
+
+```bash
+curl -s -X POST "https://api.line.me/v2/bot/message/push" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {LINE_CHANNEL_ACCESS_TOKEN}" \
+  -d '{"to":"{USER_ID}","messages":[{"type":"text","text":"{REPORT_PLAIN_TEXT}"}]}'
+```
+
+If `LINE_RECIPIENT_IDS` is empty, skip with: `⚠️ LINE recipients not configured. Skipping LINE delivery.`
+
+On success: print `✅ LINE sent to {USER_ID}`
+On failure: print error, continue to next recipient.
+
+### Step 9: Summary
+
+After all channels have been attempted, print a final summary:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Delivery Summary
+  Email: ✅ / ❌
+  LINE:  ✅ / ❌ / ⚠️ not configured
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
 ## Hard rules (never break)
 
-1. Never send email without explicit `1` / `送出` / `send` / `yes` input from the user at the approval gate.
-2. Never write repo names, issue/PR numbers, titles, or URLs that do not appear verbatim in the Step 3 raw output.
+1. Never send without explicit `1` / `送出` / `send` / `yes` at the approval gate.
+2. Never reference items not in the Step 3 raw output. Grounding applies to ALL sources.
 3. Never skip Step 1 (`gh auth` check).
-4. Never re-fetch in Step 3 during a regenerate (Step 7 option `3`). Use the raw data already in your working memory.
-5. When the user's approval-gate input is ambiguous, ask — never guess.
+4. Never re-fetch during regenerate (option 3). Use cached raw data.
+5. When approval-gate input is ambiguous, ask — never guess.
+6. Never hardcode config values. Always read from `.env`.
