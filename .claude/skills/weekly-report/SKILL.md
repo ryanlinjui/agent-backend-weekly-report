@@ -12,7 +12,7 @@ Produce a weekly report of Ryan's GitHub activity for the last 7 days and send i
 These values are fixed for MVP:
 
 - **Producer GitHub username:** `ryanlinjui`
-- **From (sender):** `ryanlinjui@gitroll.io`
+- **From (sender):** `a02733613424@gmail.com` (via Playwright driving Gmail web)
 - **To (recipient):** `ryanlinjui@gmail.com`
 - **Window:** last 7 days, ending at the current UTC timestamp
 
@@ -97,7 +97,7 @@ Print this block verbatim in the chat, substituting `{W_start}`, `{W_end}`, and 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📧 Weekly Report — {W_start} to {W_end}
 
-From: ryanlinjui@gitroll.io
+From: a02733613424@gmail.com
 To:   ryanlinjui@gmail.com
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -130,27 +130,24 @@ Then WAIT for the user's reply. Do not proceed until they respond.
 
 ### Step 8: Send
 
-**Use the Write tool** (NOT `echo`/heredoc via Bash — those will corrupt markdown that contains backticks, dollar signs, or quotes) to write the current draft markdown to this temp file path:
+Use the **Playwright MCP tools** to send the email via Gmail web. This is cross-platform (no macOS dependency) and doesn't require SMTP credentials or App Passwords.
 
-```
-/tmp/weekly-report-{W_end}.md
-```
+If the user chose `dry run` in Step 7, **skip this entire step** — just print the draft and return to Step 6. Do not open the browser.
 
-Then run via Bash (add `--dry-run` at the end only if the user chose `dry run` in Step 7):
+**Playwright send sequence:**
 
-```
-python3 .claude/skills/weekly-report/scripts/send_mail.py \
-  --to ryanlinjui@gmail.com \
-  --from ryanlinjui@gitroll.io \
-  --subject "Weekly Report — {W_start} to {W_end}" \
-  --body-file /tmp/weekly-report-{W_end}.md
-```
+1. `browser_navigate` → `https://mail.google.com/mail/u/0/#inbox?compose=new`
+2. Wait for the compose window to appear (use `browser_snapshot` to confirm)
+3. `browser_type` into the **To** field → `ryanlinjui@gmail.com` (then press Enter to confirm the recipient)
+4. `browser_type` into the **Subject** field → `Weekly Report — {W_start} to {W_end}`
+5. `browser_type` into the **Message Body** field → the clean plain-text version of the draft (strip markdown syntax: no `#`, `**`, or `-` bullets — use the same format shown in the approval gate)
+6. `browser_click` the **Send** button
 
-On **exit code 0 (real send)**: print `✅ Sent to ryanlinjui@gmail.com at HH:MM:SS` using the time from the script's `OK <timestamp>` line.
+On **successful send** (compose window closes, back to inbox): print `✅ Sent to ryanlinjui@gmail.com via Gmail`
 
-On **exit code 0 (dry run)**: print the full dry-run output from stdout, then return to Step 6.
+On **failure** (compose window still open, or error): take a `browser_snapshot`, print the error, and `❌ Send failed. Draft preserved — you can try again.` Leave the draft in conversation context so the user can ask you to retry.
 
-On **exit code non-zero**: print the captured stderr verbatim, followed by `❌ Send failed. Draft preserved — you can try again.` Leave the draft in conversation context so the user can ask you to retry.
+**Important:** The Gmail account `a02733613424@gmail.com` must already be logged in on the Playwright browser. If Gmail shows a login page instead of the inbox, tell the user to log in manually and retry.
 
 ## Hard rules (never break)
 
