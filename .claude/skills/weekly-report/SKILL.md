@@ -11,25 +11,71 @@ Produce a weekly report of the producer's activity across GitHub, Slack, and Not
 
 All settings are read from the `.env` file at the project root. **Nothing is hardcoded.** These values are set during `/weekly-report-init`.
 
-### Step 0: Load configuration
+### Step 0: Load configuration & auto-init check
 
-Read the `.env` file using the Read tool. Extract these values into working memory:
+Read the `.env` file using the Read tool. Check each required service:
 
-| Variable | Purpose |
-|---|---|
-| `GITHUB_USERNAME` | GitHub user to query PRs/issues/commits |
-| `REPORT_RECIPIENTS` | Comma-separated email addresses |
-| `REPORT_WINDOW_DAYS` | Number of days to look back (default: 7) |
-| `GMAIL_USER` | Gmail account for Playwright email sending |
-| `SLACK_BOT_TOKEN` | Slack API token for reading channels |
-| `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API token |
-| `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API token (broadcast to all followers) |
+| Variable | Purpose | How to verify |
+|---|---|---|
+| `GITHUB_USERNAME` | GitHub user to query | `gh auth status` returns OK |
+| `REPORT_RECIPIENTS` | Email addresses | Non-empty |
+| `REPORT_WINDOW_DAYS` | Days to look back (default: 7) | Non-empty |
+| `GMAIL_USER` | Gmail sender account | Non-empty |
+| `SLACK_USER_TOKEN` | Slack User Token for search | `curl` auth.test returns OK |
+| `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API | `curl` bot/info returns OK |
 
-If `.env` is missing or critical values are empty, print:
+**Auto-init: if any service is missing or broken, fix it inline — don't stop.**
+
+#### 0a: Check all services and collect what's missing
+
+Run all checks in parallel (Bash curl calls). Build a list of what needs init:
+
 ```
-❌ Configuration not found. Run /weekly-report-init first.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 Service health check
+  GitHub:  ✅ / ❌ (gh auth status)
+  Gmail:   ✅ / ❌ (GMAIL_USER set + Playwright login check)
+  Slack:   ✅ / ❌ (SLACK_USER_TOKEN valid)
+  Notion:  ✅ / ❌ (Notion MCP connected)
+  LINE:    ✅ / ❌ (LINE_CHANNEL_ACCESS_TOKEN valid)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
-…and STOP.
+
+If everything is ✅, proceed to Step 1.
+
+#### 0b: Auto-init missing services
+
+If any service is ❌, automatically start the init flow for those services.
+
+**Open ALL needed browser windows at once** using Playwright MCP, then ask the user to log in to all of them in one go:
+
+```
+⚠️ Some services need setup. I've opened browser windows for:
+  - Gmail (https://mail.google.com) — please log in
+  - Slack (https://api.slack.com/apps) — please log in
+  - LINE OA Manager (https://manager.line.biz) — please log in
+
+Please log in to all of them, then say "ok".
+```
+
+**Wait for user to say "ok" / "done" / "好了".** This is the ONLY user interaction needed for init.
+
+After user confirms login:
+1. **Gmail**: verify Playwright can access inbox. Save `GMAIL_USER` to `.env` if not set.
+2. **Slack**: if `SLACK_USER_TOKEN` is missing, navigate to the Slack App OAuth page → add User Token Scopes (`search:read`, `channels:history`, `channels:read`) → Reinstall → copy the `xoxp-` token → save to `.env`. All done via Playwright, no user action needed.
+3. **LINE**: if `LINE_CHANNEL_ACCESS_TOKEN` is missing, navigate to LINE Developers Console → create Provider + Messaging API channel (or find existing) → Issue channel access token → save to `.env`. All done via Playwright.
+4. **Notion**: check if Notion MCP tools are available. If not, print `⚠️ Notion MCP not connected — run /mcp to reconnect. Skipping Notion for this report.`
+5. **GitHub**: if `gh auth status` fails, print `⚠️ Run 'gh auth login' in terminal.` and wait for user to confirm.
+
+After all init is complete, re-run the health check to confirm all ✅, then proceed to Step 1.
+
+#### 0c: User interaction principle
+
+**The user should only interact for two things during the entire `/weekly-report` flow:**
+1. **Logging in** to browser windows (Step 0b) — happens only on first run or when sessions expire
+2. **Approving the report** (Step 6-7) — review draft → send
+
+Everything else (token creation, API setup, data fetching, drafting, sending, QA polling) is fully automated.
 
 ## Pipeline — run these steps IN ORDER
 
