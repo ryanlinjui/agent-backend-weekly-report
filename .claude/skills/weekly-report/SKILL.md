@@ -252,43 +252,17 @@ After all channels have been attempted, print a final summary:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-### Step 10: Start inbound Q&A auto-polling
+### Step 10: Done
 
-After the report is sent, automatically start a cron job that checks for replies every 30 minutes. This runs in the current session only — when the user closes Claude Code, the polling stops.
-
-Use the `CronCreate` tool with these parameters:
-
-- **cron:** `17 * * * *` (every hour at :17 — avoids :00/:30 congestion. For testing, user can request `* * * * *` for every minute)
-- **recurring:** true
-- **durable:** false (session-only — stops when session closes)
-- **prompt:**
+Print final status and available commands:
 
 ```
-Automated Q&A check for weekly-report skill.
+✅ Weekly report complete.
 
-Read .env for config. Check for inbound questions:
-
-1. EMAIL: Use Playwright MCP to open Gmail and search for unread replies with subject containing "Re: Weekly Report". For each reply, read the question, compose a grounded answer using GitHub/Slack/Notion data (re-fetch if needed), and reply via Gmail. Follow references/inbound-qa-email.md.
-
-2. LINE: Use Playwright MCP to check LINE OA Manager chat at https://chat.line.biz/account/@214lbnja for unread messages. For each message, compose a grounded answer and reply. Follow references/inbound-qa-line.md.
-
-Grounding rules: only reference items from raw data. Never fabricate. If you cannot answer, say so honestly.
-If Playwright MCP or Notion MCP is not available, skip with a warning.
-Be autonomous — do not ask for confirmation.
-Print a summary at the end.
+Available commands:
+  /weekly-report     — generate another report
+  /weekly-report-qa  — check for and reply to inbound questions
 ```
-
-After creating the cron job, print:
-
-```
-🔄 Inbound Q&A auto-polling started (every hour at :17).
-   Checks: Gmail replies + LINE messages
-   Stops when: this session closes
-   Manual check: /weekly-report-qa
-   Cancel: tell me "stop qa polling"
-```
-
-If the user says "stop qa polling" at any point, use `CronDelete` to remove the job.
 
 ## Hard rules (never break)
 
