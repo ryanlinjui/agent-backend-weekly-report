@@ -2,37 +2,79 @@
 """Send an email via macOS Mail.app using osascript.
 
 Used by the weekly-report skill. Takes the body as a file path (not argv)
-to avoid shell escaping issues with multi-line markdown.
+to avoid shell escaping issues with multi-line markdown. Converts markdown
+to clean plain text (strips syntax markers) for readable email rendering.
 """
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
 
+def markdown_to_plaintext(md: str) -> str:
+    """Convert markdown to clean plain text for email.
+
+    Strips #/##/### markers, **bold**, *italic*, replaces - bullets with
+    bullet chars, and adds underline separators under headings.
+    """
+    lines = md.split("\n")
+    out: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith("### "):
+            heading = _inline(stripped[4:])
+            out.append(heading)
+            out.append("─" * min(len(heading), 40))
+        elif stripped.startswith("## "):
+            heading = _inline(stripped[3:])
+            out.append(heading)
+            out.append("─" * min(len(heading), 40))
+        elif stripped.startswith("# "):
+            heading = _inline(stripped[2:]).upper()
+            out.append(heading)
+            out.append("═" * min(len(heading), 50))
+        elif stripped.startswith("---"):
+            out.append("─" * 40)
+        elif stripped.startswith("- "):
+            out.append(f"  • {_inline(stripped[2:])}")
+        else:
+            out.append(_inline(stripped))
+
+    return "\n".join(out)
+
+
+def _inline(text: str) -> str:
+    """Strip inline markdown: **bold** → bold, *italic* → italic, `code` → code."""
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"\1", text)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    return text
+
+
 def build_applescript(sender: str, recipient: str, subject: str, body: str) -> str:
     """Build the osascript source that sends via Mail.app.
 
+    Uses 'content' (plain text) because Mail.app's 'html content' property
+    does not reliably produce HTML emails that Gmail can render.
     Escapes backslashes first, then double quotes, for AppleScript string literals.
     """
     def esc(s: str) -> str:
         return s.replace("\\", "\\\\").replace('"', '\\"')
 
-    sender_e = esc(sender)
-    recipient_e = esc(recipient)
-    subject_e = esc(subject)
-    body_e = esc(body)
-
     return (
         f'tell application "Mail"\n'
         f'    set newMessage to make new outgoing message with properties '
-        f'{{subject:"{subject_e}", content:"{body_e}", sender:"{sender_e}", visible:false}}\n'
+        f'{{subject:"{esc(subject)}", content:"{esc(body)}", '
+        f'sender:"{esc(sender)}", visible:false}}\n'
         f'    tell newMessage\n'
         f'        make new to recipient at end of to recipients '
-        f'with properties {{address:"{recipient_e}"}}\n'
+        f'with properties {{address:"{esc(recipient)}"}}\n'
         f'    end tell\n'
         f'    send newMessage\n'
         f'end tell'
@@ -52,7 +94,7 @@ def main() -> int:
     parser.add_argument(
         "--body-file",
         required=True,
-        help="Path to a file containing the email body (utf-8)",
+        help="Path to a file containing the email body in markdown (utf-8)",
     )
     parser.add_argument(
         "--dry-run",
@@ -66,11 +108,14 @@ def main() -> int:
         print(f"error: body-file not found: {args.body_file}", file=sys.stderr)
         return 1
 
-    body = body_path.read_text(encoding="utf-8")
+    md = body_path.read_text(encoding="utf-8")
+    body = markdown_to_plaintext(md)
     script = build_applescript(args.sender, args.to, args.subject, body)
 
     if args.dry_run:
-        print("=== DRY RUN: osascript that would be executed ===")
+        print("=== DRY RUN: plain text body that would be sent ===")
+        print(body)
+        print("=== osascript ===")
         print(script)
         print("=== END DRY RUN ===")
         return 0
