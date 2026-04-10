@@ -61,7 +61,7 @@ Read [assets/approval-gate-template.md](assets/approval-gate-template.md), subst
 
 ### Step 8: Send
 
-- **8a: Email** — follow [references/send-email.md](references/send-email.md) (Computer Use MCP + Mail.app)
+- **8a: Email** — follow [references/send-email.md](references/send-email.md) (osascript + Mail.app, no MCP needed)
 - **8b: LINE** — follow [references/send-line.md](references/send-line.md)
 
 Each channel is independent — if one fails, continue to the next.

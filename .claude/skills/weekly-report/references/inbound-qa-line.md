@@ -1,38 +1,33 @@
 # Inbound Q&A — LINE
 
-Check for and respond to messages sent to the LINE bot.
-
 ## Limitation
 
-LINE Bot MCP can **send** messages (broadcast/push) but **cannot read** incoming messages — LINE's Messaging API requires a webhook server to receive events. Without a webhook, the agent cannot detect when someone sends a question.
+LINE Bot MCP can **send** messages (broadcast/push) but **cannot read** incoming messages — LINE requires a webhook server to receive message events, which this skill does not include.
 
-## Workaround options (in priority order)
+## Approach: redirect to Slack
 
-### Option A: Computer Use MCP + LINE desktop app (if installed)
-
-If the user has the LINE desktop app installed on macOS:
-
-1. `request_access` for LINE app
-2. `open_application` → "LINE"
-3. `screenshot` to see chat list
-4. Look for unread messages from the Weekly Report Agent chat
-5. `click` on the chat
-6. `screenshot` to read the message
-7. Compose grounded answer
-8. `type` the answer + `key` → `Return` to send
-
-### Option B: Notify user to check manually
-
-If neither Computer Use nor LINE desktop is available:
+When broadcasting the weekly report via LINE (Step 8b), append a note at the end of the message:
 
 ```
-📭 LINE inbound Q&A is not available in this session.
-   LINE Bot MCP can send but cannot read incoming messages.
-   Please check LINE manually for any questions.
+有問題請到 Slack #general 討論，我會自動回覆。
 ```
 
-## Grounding rules (same as email Q&A)
-- Only reference items from raw data
-- Cite specific items
-- Never fabricate
-- If cannot answer: "抱歉，這個問題超出目前週報的資料範圍。建議直接聯繫相關人員。"
+This redirects LINE recipients to Slack, where Slack MCP can detect and respond to questions.
+
+## LINE Q&A summary
+
+When `/weekly-report-qa` runs, print:
+
+```
+📭 LINE: inbound Q&A not available (no webhook).
+   LINE recipients are directed to ask on Slack.
+```
+
+## Future improvement
+
+To enable true LINE inbound Q&A, set up a webhook server that:
+1. Receives LINE message events
+2. Stores them in a file or database
+3. The skill reads that file during Q&A polling
+
+This requires external infrastructure (cloud function, server) beyond the scope of this skill.
