@@ -1,10 +1,12 @@
 # Send Report via Email
 
-Send the approved report using osascript to control macOS Mail.app via Bash tool.
+Send the approved report using IMAP/SMTP — works with any email provider.
 
 ## Prerequisites
-- macOS with Mail.app configured (sender account matching `GMAIL_USER` in `.env`)
-- No MCP needed — uses Bash tool + osascript only
+- `EMAIL_USER` and `EMAIL_PASSWORD` (App Password) in `.env`
+- IMAP/SMTP hosts auto-detected from email domain (Gmail, Outlook, Yahoo, iCloud, etc.)
+- Override with `EMAIL_IMAP_HOST` / `EMAIL_SMTP_HOST` in `.env` if needed
+- Python 3 stdlib only — zero pip dependencies
 
 ## Steps
 
@@ -12,34 +14,20 @@ Send the approved report using osascript to control macOS Mail.app via Bash tool
 
 Use the Write tool to save the clean plain-text draft to `/tmp/weekly-report-body.txt`.
 
-### 2. Send via osascript
-
-Run via Bash:
+### 2. Send
 
 ```bash
-SUBJECT="Weekly Report — {W_start} to {W_end}"
-TO="{REPORT_RECIPIENTS}"
-SENDER="{GMAIL_USER}"
-BODY=$(cat /tmp/weekly-report-body.txt)
-
-osascript <<APPLESCRIPT
-tell application "Mail"
-    set newMessage to make new outgoing message with properties {subject:"$SUBJECT", sender:"$SENDER", visible:false}
-    set content of newMessage to "$BODY"
-    tell newMessage
-        make new to recipient at end of to recipients with properties {address:"$TO"}
-    end tell
-    send newMessage
-end tell
-APPLESCRIPT
+source .env
+python3 .claude/skills/weekly-report/scripts/email-client.py send \
+  --to "{REPORT_RECIPIENTS}" \
+  --subject "Weekly Report — {W_start} to {W_end}" \
+  --body-file /tmp/weekly-report-body.txt
 ```
 
-**Note:** For multi-line body with special characters, write the body to a temp file first, then read it in the osascript via `do shell script "cat /tmp/weekly-report-body.txt"`.
+### 3. Result
 
-### 3. Verify
-
-On success (osascript exits 0): print `✅ Email sent to {REPORT_RECIPIENTS}`
-On failure: print stderr + `❌ Email send failed.`
+On `OK` → print `✅ Email sent to {REPORT_RECIPIENTS}`
+On error → print the error + `❌ Email send failed.`
 
 ### 4. Clean up
 
@@ -47,6 +35,19 @@ On failure: print stderr + `❌ Email send failed.`
 rm -f /tmp/weekly-report-body.txt
 ```
 
+## Auto-detection
+
+The script auto-detects IMAP/SMTP servers from the email domain:
+
+| Domain | IMAP | SMTP |
+|---|---|---|
+| gmail.com | imap.gmail.com:993 | smtp.gmail.com:587 |
+| outlook.com / hotmail.com | outlook.office365.com:993 | smtp.office365.com:587 |
+| yahoo.com | imap.mail.yahoo.com:993 | smtp.mail.yahoo.com:465 |
+| icloud.com / me.com | imap.mail.me.com:993 | smtp.mail.me.com:587 |
+| other | imap.{domain}:993 | smtp.{domain}:587 |
+
 ## Fallback
 
-If osascript fails (Mail.app not configured, permission denied), skip email with warning.
+If SMTP fails (auth error), the script prints a helpful message about using App Passwords.
+On macOS, fallback to osascript + Mail.app if SMTP is unavailable.

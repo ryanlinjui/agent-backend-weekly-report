@@ -1,68 +1,56 @@
 # Inbound Q&A — Email
 
-Check for replies to the weekly report and respond via osascript + Mail.app.
+Check for replies to the weekly report and respond via IMAP/SMTP — works with any email provider.
 
 ## Prerequisites
-- macOS with Mail.app configured
-- No MCP needed — uses Bash tool + osascript only
+- `EMAIL_USER` and `EMAIL_PASSWORD` in `.env`
+- Same universal email client as send-email.md
 
 ## Flow
 
-### 1. Search for unread replies
-
-Run via Bash:
+### 1. Read unread replies
 
 ```bash
-osascript <<'APPLESCRIPT'
-tell application "Mail"
-    set results to ""
-    set unreadMessages to (every message of inbox whose read status is false and subject contains "Re: Weekly Report")
-    repeat with msg in unreadMessages
-        set msgSender to sender of msg
-        set msgSubject to subject of msg
-        set msgContent to content of msg
-        set msgDate to date received of msg
-        set results to results & "---FROM: " & msgSender & linefeed & "DATE: " & msgDate & linefeed & "SUBJECT: " & msgSubject & linefeed & "BODY: " & msgContent & linefeed & linefeed
-    end repeat
-    return results
-end tell
-APPLESCRIPT
+source .env
+python3 .claude/skills/weekly-report/scripts/email-client.py read \
+  --search 'UNSEEN SUBJECT "Re: Weekly Report"'
 ```
 
-If output is empty: `📭 No new questions found in email replies.` → done.
+Returns JSON array:
+```json
+[
+  {
+    "message_id": "<abc@mail.gmail.com>",
+    "from": "Wei <wei@example.com>",
+    "subject": "Re: Weekly Report — 2026-04-04 to 2026-04-11",
+    "date": "Fri, 11 Apr 2026 10:30:00 +0800",
+    "body": "Collaboration Network PR 改了什麼？",
+    "uid": "42"
+  }
+]
+```
 
-### 2. Parse each question
+If empty array: `📭 No new questions found in email replies.` → done.
 
-From the output, extract each message's sender, date, and body (the question).
+### 2. Compose grounded answer
 
-### 3. Compose grounded answer
-
-Using the **last report's raw data**:
+For each message, using the **last report's raw data**:
 - Only reference items from raw data
 - Cite specific PRs, issues, Slack messages, Notion pages
 - If cannot answer: "這個問題超出目前週報的資料範圍，建議直接聯繫相關人員。"
 - Never fabricate
 
-### 4. Reply via osascript
-
-For each question, reply:
+### 3. Reply
 
 ```bash
-osascript <<'APPLESCRIPT'
-tell application "Mail"
-    set theMessage to first message of inbox whose subject contains "Re: Weekly Report" and sender contains "{SENDER_EMAIL}" and read status is false
-    set theReply to reply theMessage
-    set content of theReply to "{ANSWER}"
-    send theReply
-    set read status of theMessage to true
-end tell
-APPLESCRIPT
+source .env
+python3 .claude/skills/weekly-report/scripts/email-client.py reply \
+  --uid "42" \
+  --body "Collaboration Network (#331) 重構為 top-N contributors model..."
 ```
 
-### 5. Summary
+This sends a proper threaded reply (In-Reply-To + References headers) and marks the original as read.
+
+### 4. Summary
 
 Print how many questions were answered.
-
-## Fallback
-
-If osascript fails, skip email Q&A with a warning.
