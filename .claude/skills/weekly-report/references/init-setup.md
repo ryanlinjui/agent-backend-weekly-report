@@ -125,9 +125,11 @@ open_url() {
 }
 ```
 
-### Step 1: Open login page → user logs in
+### Step 1: Open login page via Chrome DevTools MCP → user logs in
 
-Detect provider from `EMAIL_USER` domain, then open the account login page:
+Use Chrome DevTools MCP to open the provider's login page. The user logs in and does 2FA in that browser window.
+
+Detect provider from `EMAIL_USER` domain:
 
 | Domain | Login URL |
 |---|---|
@@ -136,68 +138,56 @@ Detect provider from `EMAIL_USER` domain, then open the account login page:
 | yahoo.com | `https://login.yahoo.com` |
 | icloud.com / me.com | `https://appleid.apple.com` |
 
-```bash
-open_url "{LOGIN_URL}"
+```
+Chrome DevTools MCP: navigate_page → {LOGIN_URL}
 ```
 
 Print:
 ```
-🌐 Email login page opened in your browser.
-   Please log in to {EMAIL_USER}, then say "ok".
+🌐 Login page opened. Please:
+   1. Log in to {EMAIL_USER}
+   2. Complete phone/2FA verification if prompted
+   Then say "ok".
 ```
 
-**Wait for "ok".**
+**Wait for "ok".** User only does login + phone verification. Nothing else.
 
-### Step 2: Open 2FA page → user enables (if not already on)
+### Step 2: Skill auto-navigates to 2FA settings
 
-```bash
-# Gmail
-open_url "https://myaccount.google.com/signinoptions/two-step-verification"
-# Outlook
-open_url "https://account.live.com/proofs/manage"
-# Yahoo
-open_url "https://login.yahoo.com/myc/security"
-# iCloud
-open_url "https://appleid.apple.com/account/manage"
+After user confirms login, skill uses Chrome DevTools MCP to check if 2FA is enabled:
+
+```
+Chrome DevTools MCP: navigate_page → https://myaccount.google.com/signinoptions/two-step-verification
+Chrome DevTools MCP: take_snapshot → check if 2FA is "On" or "Off"
 ```
 
-Print:
+- If 2FA is already ON → skip to Step 3
+- If 2FA is OFF → print: `🌐 Please enable 2FA on this page (phone verification), then say "ok".` → wait → re-check
+
+### Step 3: Skill auto-creates App Password
+
+After 2FA is confirmed ON, skill navigates to App Passwords and creates one automatically:
+
 ```
-🌐 2FA settings page opened.
-   Enable 2-Step Verification if not already on, then say "ok".
-   (If already enabled, just say "ok".)
-```
-
-**Wait for "ok".**
-
-### Step 3: Open App Password page → user creates + pastes
-
-```bash
-# Gmail
-open_url "https://myaccount.google.com/apppasswords"
-# Outlook
-open_url "https://account.live.com/proofs/AppPassword"
-# Yahoo — no direct URL, user navigates from security page
-# iCloud
-open_url "https://appleid.apple.com/account/manage" # → Sign-In & Security → App-Specific Passwords
+Chrome DevTools MCP: navigate_page → https://myaccount.google.com/apppasswords
+Chrome DevTools MCP: take_snapshot → find the "App name" input field
+Chrome DevTools MCP: fill → type "weekly-report"
+Chrome DevTools MCP: click → "Create" button
+Chrome DevTools MCP: take_snapshot → read the generated 16-character App Password from the page
 ```
 
-Print:
-```
-🌐 App Password page opened.
-   Create one named "weekly-report", then paste it here.
-   (This is NOT your main password — it's a separate app-specific token.)
-```
+Extract the App Password from the page content (it's displayed once after creation).
 
-**Wait for user to paste the App Password.**
+**No user interaction needed for this step.** Skill does it all.
+
+For Outlook/Yahoo/iCloud: adapt the navigation steps to each provider's App Password UI.
 
 ### Step 4: Save + verify
 
-Save ONLY the App Password to `.env` as `EMAIL_PASSWORD` (never the main password):
+Save the App Password to `.env` as `EMAIL_PASSWORD`:
 
 ```bash
-# Update .env
-# ... write EMAIL_PASSWORD=<pasted value>
+# Update .env with the extracted App Password
 ```
 
 Auto-send a test email to verify:
@@ -209,7 +199,7 @@ python3 .claude/skills/weekly-report/scripts/email-client.py send \
 ```
 
 If OK → `✅ Email configured. Check your inbox for a test email.`
-If fail → print error, re-open App Password page, ask user to try again.
+If fail → print error, retry from Step 3.
 
 ## 0d: Combine manual steps
 
