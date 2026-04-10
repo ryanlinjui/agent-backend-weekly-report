@@ -43,41 +43,81 @@ Run all checks in parallel (Bash curl calls). Build a list of what needs init:
 
 If everything is ✅, proceed to Step 1.
 
-#### 0b: Auto-init missing services
+#### 0b: Auto-install missing MCP servers
 
-If any service is ❌, automatically start the init flow for those services.
+If any MCP is missing, **auto-install it** before asking the user to do anything.
 
-Check which MCPs are connected and guide the user to connect missing ones:
+**Step 1: Detect environment**
+
+Check if running in Claude Code or Claude Desktop:
+- Claude Code: `claude --version` succeeds via Bash → use `claude mcp add-json` to install
+- Claude Desktop: check if `~/Library/Application Support/Claude/claude_desktop_config.json` exists → edit it directly with Write tool
+
+**Step 2: Auto-install missing MCPs**
+
+For each missing MCP, install it automatically:
+
+**Slack MCP** (if Slack plugin tools not available):
+Claude Code plugin — user needs to run `/mcp` to connect. Print: `⚠️ Run /mcp → connect Slack plugin`
+
+**Notion MCP** (if Notion plugin tools not available):
+Claude Code plugin — user needs to run `/mcp` to connect. Print: `⚠️ Run /mcp → connect Notion plugin`
+
+**LINE Bot MCP** (if `mcp__line-bot__*` tools not available):
+```bash
+# Claude Code:
+claude mcp add-json line-bot '{"type":"stdio","command":"npx","args":["@line/line-bot-mcp-server"],"env":{"CHANNEL_ACCESS_TOKEN":"<read from .env>"}}'
+```
+For Claude Desktop, write to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "line-bot": {
+      "command": "npx",
+      "args": ["@line/line-bot-mcp-server"],
+      "env": {
+        "CHANNEL_ACCESS_TOKEN": "<read from .env>"
+      }
+    }
+  }
+}
+```
+
+**Chrome DevTools MCP** (if chrome-devtools tools not available):
+Claude Code plugin — user needs to run `/plugin` to install. Print: `⚠️ Run /plugin → install chrome-devtools-mcp`
+
+**GitHub** (if `gh auth status` fails):
+Print: `⚠️ Run 'gh auth login' in terminal`
+
+**Step 3: Ask user to complete one-time actions**
+
+After auto-installing what can be automated, print ONE combined message for remaining manual steps:
 
 ```
-⚠️ Some services need setup:
-  - Slack MCP: run /mcp → connect Slack
-  - Notion MCP: run /mcp → connect Notion
-  - LINE Bot MCP: run /mcp → connect line-bot
-  - Chrome DevTools MCP: run /mcp → connect chrome-devtools (for Gmail)
-  - GitHub: run 'gh auth login' in terminal
+⚠️ First-time setup (one-time only):
+  {list only the items that still need user action}
 
-Please connect them, then say "ok".
+Please complete these, then say "ok".
 ```
 
-**Wait for user to say "ok" / "done" / "好了".** This is the ONLY user interaction needed for init.
+If no manual steps needed (everything auto-installed), skip directly to verification.
 
-After user confirms:
-1. **Gmail**: verify Chrome DevTools MCP is connected and can access Gmail. User must be logged into Gmail in their Chrome browser.
-2. **Slack**: verify Slack MCP is connected. Test with a search query.
-3. **Notion**: verify Notion MCP is connected. Test with a meeting notes query.
-4. **LINE**: verify LINE Bot MCP is connected. Test with a bot info query.
-5. **GitHub**: verify `gh auth status` passes.
+**Wait for user to say "ok" / "done" / "好了"** — only if there are manual steps.
 
-After all init is complete, re-run the health check to confirm all ✅, then proceed to Step 1.
+**Step 4: Verify all services**
+
+Re-run the health check from Step 0a. If all ✅, proceed to Step 1.
+If something still fails, print the specific error and ask user to fix.
+
+For Claude Desktop: print `⚠️ Please restart Claude Desktop to apply MCP changes, then say "ok".`
 
 #### 0c: User interaction principle
 
 **The user should only interact for two things during the entire `/weekly-report` flow:**
-1. **Logging in** to browser windows (Step 0b) — happens only on first run or when sessions expire
+1. **First-run setup** (Step 0b) — connect MCPs, restart app if needed. Only happens once.
 2. **Approving the report** (Step 6-7) — review draft → send
 
-Everything else (token creation, API setup, data fetching, drafting, sending, QA polling) is fully automated.
+Everything else (MCP installation, data fetching, drafting, sending, QA polling) is fully automated.
 
 ## Pipeline — run these steps IN ORDER
 
