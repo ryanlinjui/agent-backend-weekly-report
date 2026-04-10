@@ -134,7 +134,7 @@ Fallback for commits: `gh repo list --limit 100 --json nameWithOwner` then per-r
 
 Read and follow `references/fetch-slack.md`.
 
-Use Bash with `curl` and `SLACK_BOT_TOKEN` to fetch the producer's messages from team channels in the report window. If `SLACK_BOT_TOKEN` is empty, skip with a warning.
+Use Slack MCP tools (`mcp__plugin_slack_slack__slack_search_public_and_private`, `mcp__plugin_slack_slack__slack_read_channel`, `mcp__plugin_slack_slack__slack_read_thread`) to fetch the producer's messages and key discussions. If Slack MCP is not connected, fallback to `SLACK_USER_TOKEN` from `.env` with curl. If neither is available, skip with a warning.
 
 #### 3c: Notion
 
@@ -151,14 +151,16 @@ Read `references/report-template.md`. Follow its sections, order, and emojis exa
 Compose the report following the template. Rules:
 
 1. **Grounding (critical):** You may only reference items that appear verbatim in the Step 3 raw output (from ANY source — GitHub, Slack, or Notion). Every bullet must trace to raw data. **The TL;DR is also bound by this rule — do not invent claims about focus areas, themes, impact, or narrative that cannot be traced to fetched items.** If a field is missing, omit the bullet. **Do not invent anything. An empty section is always preferable to a fabricated one.**
-2. **TL;DR is always present.** 2–3 sentences summarizing the week, drawing from all available sources.
-3. **`🚀 Shipped`** = merged PRs + closed issues (from GitHub). Omit if none.
-4. **`🛠 In Progress`** = open PRs + open issues (from GitHub). Omit if none.
-5. **`📌 Other Activity`** = OPTIONAL. Include notable items from Slack messages, Notion meeting notes, or direct commits not tied to PRs. Omit if nothing worth noting.
-6. **Source attribution:** When citing Slack or Notion content, note the source (e.g., "discussed in #general", "per 4/7 Scrum Meeting notes").
-7. **Empty window:** if all sources returned zero items, TL;DR says `本週無活動紀錄。` and all other sections are omitted.
-8. Replace `{START_DATE}` and `{END_DATE}` in the template with `W_start` and `W_end`.
-9. **Source availability note:** If any source was skipped (Slack token missing, Notion MCP disconnected), add a line at the bottom: `⚠️ Note: {source} data was unavailable for this report.`
+2. **TL;DR is always present.** 2–3 sentences summarizing the week, drawing from ALL available sources (GitHub + Slack + Notion).
+3. **`🚀 Shipped (GitHub)`** = merged PRs + closed issues. Omit section if none.
+4. **`🛠 In Progress (GitHub)`** = open PRs + open issues. Omit section if none.
+5. **`💬 Slack Highlights`** = key discussions, decisions, coordination from Slack channels. Each bullet includes `#channel-name`. Omit section if no Slack data or nothing notable.
+6. **`📝 Meeting Notes (Notion)`** = key takeaways from meetings attended. Each bullet includes meeting title + date. Omit section if no Notion data or no meetings in window.
+7. **`📌 Other Activity`** = OPTIONAL. Direct commits without PRs, other notable items. Omit if nothing worth noting.
+8. **Source attribution:** Always include channel name for Slack (`#channel`), meeting title for Notion.
+9. **Empty window:** if all sources returned zero items, TL;DR says `本週無活動紀錄。` and all other sections are omitted.
+10. Replace `{START_DATE}` and `{END_DATE}` in the template with `W_start` and `W_end`.
+11. **Source availability note:** If any source was skipped (Slack MCP disconnected, Notion MCP disconnected), add a line at the bottom: `⚠️ Note: {source} data was unavailable for this report.`
 
 ### Step 6: Show the approval gate
 
@@ -252,17 +254,43 @@ After all channels have been attempted, print a final summary:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-### Step 10: Done
+### Step 10: Start inbound Q&A auto-polling
 
-Print final status and available commands:
+After the report is sent, automatically start a cron job that checks for replies every 30 minutes. This runs in the current session only — when the user closes Claude Code, the polling stops.
+
+Use the `CronCreate` tool with these parameters:
+
+- **cron:** `17 * * * *` (every hour at :17 — avoids :00/:30 congestion. For testing, user can request `* * * * *` for every minute)
+- **recurring:** true
+- **durable:** false (session-only — stops when session closes)
+- **prompt:**
 
 ```
-✅ Weekly report complete.
+Automated Q&A check for weekly-report skill.
 
-Available commands:
-  /weekly-report     — generate another report
-  /weekly-report-qa  — check for and reply to inbound questions
+Read .env for config. Check for inbound questions:
+
+1. EMAIL: Use Playwright MCP to open Gmail and search for unread replies with subject containing "Re: Weekly Report". For each reply, read the question, compose a grounded answer using GitHub/Slack/Notion data (re-fetch if needed), and reply via Gmail. Follow references/inbound-qa-email.md.
+
+2. LINE: Use Playwright MCP to check LINE OA Manager chat at https://chat.line.biz/account/@214lbnja for unread messages. For each message, compose a grounded answer and reply. Follow references/inbound-qa-line.md.
+
+Grounding rules: only reference items from raw data. Never fabricate. If you cannot answer, say so honestly.
+If Playwright MCP or Notion MCP is not available, skip with a warning.
+Be autonomous — do not ask for confirmation.
+Print a summary at the end.
 ```
+
+After creating the cron job, print:
+
+```
+🔄 Inbound Q&A auto-polling started (every hour at :17).
+   Checks: Gmail replies + LINE messages
+   Stops when: this session closes
+   Manual check: /weekly-report-qa
+   Cancel: tell me "stop qa polling"
+```
+
+If the user says "stop qa polling" at any point, use `CronDelete` to remove the job.
 
 ## Hard rules (never break)
 

@@ -1,45 +1,37 @@
 # Fetch Slack Messages
 
-Read the producer's messages from Slack using the User OAuth Token and search API.
+Read the producer's messages and key discussions from Slack using the Slack MCP tools.
 
 ## Prerequisites
-- `SLACK_USER_TOKEN` must be set in `.env` (a `xoxp-` token with `search:read` scope)
-- No bot join needed — User Token has access to all channels the producer is a member of
+- Slack MCP must be connected in Claude Code (`mcp__plugin_slack_slack__*` tools available)
+- No API tokens needed — MCP handles authentication
 
 ## Steps
 
 ### 1. Search for producer's messages in the window
 
-Use the Slack `search.messages` API with the User Token. This searches across ALL channels the user has access to — no need to list/join channels individually.
+Use `mcp__plugin_slack_slack__slack_search_public_and_private` to search for the producer's messages:
 
-```bash
-curl -s -G "https://slack.com/api/search.messages" \
-  -H "Authorization: Bearer $SLACK_USER_TOKEN" \
-  --data-urlencode "query=from:me after:{W_start}" \
-  --data-urlencode "sort=timestamp" \
-  --data-urlencode "count=50"
-```
+Query: `from:me after:{W_start}` (searches ALL channels the user has access to)
 
-`from:me` filters to the authenticated user's own messages. `after:{W_start}` filters by date.
+### 2. Read key channels
 
-### 2. Parse results
+For channels with significant activity, use `mcp__plugin_slack_slack__slack_read_channel` to get full context of discussions the producer participated in.
 
-The response contains `messages.matches[]` with:
-- `channel.name` — which channel
-- `ts` — timestamp
-- `text` — message content
-- `permalink` — link to the message
+### 3. Read important threads
 
-Keep the raw matches. Do NOT summarize yet — that happens at the draft step.
-
-### 3. If search returns too many results
-
-If more than 50 messages, paginate using `page=2`, `page=3`, etc. until all messages in the window are fetched.
+For threaded discussions, use `mcp__plugin_slack_slack__slack_read_thread` to get the full thread context.
 
 ### 4. Output format
 
-Keep raw messages with: channel name, timestamp, text content, permalink. Do NOT summarize yet.
+Keep the raw messages with: channel name, timestamp, text content. Focus on:
+- Decisions made
+- Tasks discussed or assigned
+- Coordination with teammates
+- Notable discussions
+
+Do NOT summarize yet — that happens at the draft step.
 
 ## Fallback
 
-If `SLACK_USER_TOKEN` is not set, try `SLACK_BOT_TOKEN` as fallback (but bot needs to be in the channels). If neither is set, skip Slack source with a warning. Do not fail the entire pipeline.
+If Slack MCP is not connected, try using `SLACK_USER_TOKEN` from `.env` with curl (search.messages API). If neither is available, skip Slack source with a warning. Do not fail the entire pipeline.
