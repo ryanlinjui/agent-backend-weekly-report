@@ -23,7 +23,7 @@ Read the `.env` file using the Read tool. Extract these values into working memo
 | `GMAIL_USER` | Gmail account for Playwright email sending |
 | `SLACK_BOT_TOKEN` | Slack API token for reading channels |
 | `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API token |
-| `LINE_RECIPIENT_IDS` | Comma-separated LINE user IDs |
+| `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API token (broadcast to all followers) |
 
 If `.env` is missing or critical values are empty, print:
 ```
@@ -124,7 +124,7 @@ Print this block in chat, substituting real values:
 
 From: {GMAIL_USER}
 To:   {REPORT_RECIPIENTS}
-LINE: {LINE_RECIPIENT_IDS or "not configured"}
+LINE: broadcast to all followers of @214lbnja
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <FULL DRAFT HERE>
@@ -180,19 +180,19 @@ On failure: print error + `❌ Email send failed.`
 
 Read and follow `references/send-line.md`.
 
-For each user ID in `LINE_RECIPIENT_IDS`, use Bash with `curl`:
+Use the broadcast API to send to ALL bot followers at once (no user IDs needed):
 
 ```bash
-curl -s -X POST "https://api.line.me/v2/bot/message/push" \
+curl -s -X POST "https://api.line.me/v2/bot/message/broadcast" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {LINE_CHANNEL_ACCESS_TOKEN}" \
-  -d '{"to":"{USER_ID}","messages":[{"type":"text","text":"{REPORT_PLAIN_TEXT}"}]}'
+  -d '{"messages":[{"type":"text","text":"{REPORT_PLAIN_TEXT}"}]}'
 ```
 
-If `LINE_RECIPIENT_IDS` is empty, skip with: `⚠️ LINE recipients not configured. Skipping LINE delivery.`
+If `LINE_CHANNEL_ACCESS_TOKEN` is empty, skip with: `⚠️ LINE not configured. Skipping LINE delivery.`
 
-On success: print `✅ LINE sent to {USER_ID}`
-On failure: print error, continue to next recipient.
+On success (`{}` response): print `✅ LINE broadcast sent to all followers`
+On failure: print error.
 
 ### Step 9: Summary
 
