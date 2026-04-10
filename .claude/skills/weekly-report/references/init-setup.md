@@ -125,81 +125,106 @@ open_url() {
 }
 ```
 
-### Step 1: Open login page via Chrome DevTools MCP → user logs in
+### Core principle
 
-Use Chrome DevTools MCP to open the provider's login page. The user logs in and does 2FA in that browser window.
+**Skill drives the browser at ALL times.** After each action, `take_snapshot` to see the result and decide the next action. Only pause and ask the user when something **physically requires them** (typing their password, phone SMS code, CAPTCHA). Never print instructions for things the skill can click/fill itself.
 
-Detect provider from `EMAIL_USER` domain:
-
-| Domain | Login URL |
-|---|---|
-| gmail.com / Google Workspace | `https://accounts.google.com/signin` |
-| outlook.com / hotmail.com | `https://login.live.com` |
-| yahoo.com | `https://login.yahoo.com` |
-| icloud.com / me.com | `https://appleid.apple.com` |
+### Step 1: Open login page
 
 ```
 Chrome DevTools MCP: navigate_page → {LOGIN_URL}
+Chrome DevTools MCP: take_snapshot → see what's on screen
 ```
 
-Print:
+Provider URLs:
+- gmail.com / Google Workspace → `https://accounts.google.com/signin`
+- outlook.com / hotmail.com → `https://login.live.com`
+- yahoo.com → `https://login.yahoo.com`
+- icloud.com / me.com → `https://appleid.apple.com`
+
+If the page shows an email input field: skill fills it with `EMAIL_USER` via `fill`, then clicks Next.
+
+If the page shows a password field: **STOP and ask user.**
 ```
-🌐 Login page opened. Please:
-   1. Log in to {EMAIL_USER}
-   2. Complete phone/2FA verification if prompted
-   Then say "ok".
+🔐 Please enter your password on the browser page, then say "ok".
 ```
+**Wait for "ok".** This is the only reason to pause — skill cannot and should not handle the user's main password.
 
-**Wait for "ok".** User only does login + phone verification. Nothing else.
+### Step 2: Handle 2FA / phone verification
 
-### Step 2: Skill auto-navigates to 2FA settings
+After login, `take_snapshot` to check what page we're on:
 
-After user confirms login, skill uses Chrome DevTools MCP to check if 2FA is enabled:
+- **If on a 2FA prompt (SMS code, authenticator, etc.):** STOP and ask user.
+  ```
+  📱 Phone verification needed. Complete it on the browser page, then say "ok".
+  ```
+  **Wait for "ok".**
+
+- **If already logged in (account page / dashboard):** proceed silently to Step 3.
+
+### Step 3: Navigate to 2FA settings and ensure it's ON
+
+Skill drives — no user interaction:
 
 ```
 Chrome DevTools MCP: navigate_page → https://myaccount.google.com/signinoptions/two-step-verification
-Chrome DevTools MCP: take_snapshot → check if 2FA is "On" or "Off"
+Chrome DevTools MCP: take_snapshot → check if 2FA is "On" or needs setup
 ```
 
-- If 2FA is already ON → skip to Step 3
-- If 2FA is OFF → print: `🌐 Please enable 2FA on this page (phone verification), then say "ok".` → wait → re-check
+- If 2FA is ON → proceed to Step 4
+- If 2FA is OFF → skill clicks "Turn on" / "Get started" button → `take_snapshot`
+  - If it asks for phone number: **STOP** → `📱 Please enter your phone number and verify, then say "ok".` → wait → re-check
+  - If it asks for other verification: **STOP** → tell user what to do → wait
+  - After user confirms → `take_snapshot` → verify 2FA is now ON
 
-### Step 3: Skill auto-creates App Password
+### Step 4: Create App Password automatically
 
-After 2FA is confirmed ON, skill navigates to App Passwords and creates one automatically:
+Skill drives — no user interaction:
 
 ```
 Chrome DevTools MCP: navigate_page → https://myaccount.google.com/apppasswords
-Chrome DevTools MCP: take_snapshot → find the "App name" input field
-Chrome DevTools MCP: fill → type "weekly-report"
-Chrome DevTools MCP: click → "Create" button
-Chrome DevTools MCP: take_snapshot → read the generated 16-character App Password from the page
+Chrome DevTools MCP: take_snapshot → see the App Passwords page
 ```
 
-Extract the App Password from the page content (it's displayed once after creation).
+Then:
+1. `fill` the "App name" field → type `weekly-report`
+2. `click` the "Create" button
+3. `take_snapshot` → read the generated 16-character App Password from the page
+4. Extract the password text from the snapshot
 
-**No user interaction needed for this step.** Skill does it all.
+**No user interaction.** Skill reads the password directly from the page.
 
-For Outlook/Yahoo/iCloud: adapt the navigation steps to each provider's App Password UI.
+For Outlook/Yahoo/iCloud: adapt navigation + clicks to each provider's UI. Same principle: skill clicks everything, user only types passwords/verification codes.
 
-### Step 4: Save + verify
+### Step 5: Save + verify
 
-Save the App Password to `.env` as `EMAIL_PASSWORD`:
-
+Save the App Password to `.env`:
 ```bash
-# Update .env with the extracted App Password
+# Write EMAIL_PASSWORD=<extracted 16-char password> to .env
 ```
 
-Auto-send a test email to verify:
-
+Auto-send test email:
 ```bash
 python3 .claude/skills/weekly-report/scripts/email-client.py send \
   --to "$EMAIL_USER" --subject "Weekly Report — email test" \
   --body-file <(echo "If you see this, email is configured correctly.")
 ```
 
-If OK → `✅ Email configured. Check your inbox for a test email.`
-If fail → print error, retry from Step 3.
+If OK → `✅ Email configured.`
+If fail → retry from Step 4.
+
+### Summary of when to pause vs. auto-drive
+
+| Page shows | Skill does | Ask user? |
+|---|---|---|
+| Email input | Fill with EMAIL_USER, click Next | ❌ |
+| Password input | — | ✅ "Please enter password" |
+| SMS / phone verification | — | ✅ "Please complete verification" |
+| CAPTCHA | — | ✅ "Please solve CAPTCHA" |
+| 2FA settings page | Click buttons, navigate | ❌ |
+| App Password creation | Fill name, click Create, read result | ❌ |
+| App Password displayed | Read + save to .env | ❌ |
+| Any other clickable UI | Click it | ❌ |
 
 ## 0d: Combine manual steps
 
