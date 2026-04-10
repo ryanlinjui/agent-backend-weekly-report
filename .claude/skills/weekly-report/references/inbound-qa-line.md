@@ -1,53 +1,38 @@
 # Inbound Q&A — LINE
 
-Check for and respond to messages sent to the LINE Official Account bot.
+Check for and respond to messages sent to the LINE bot.
 
-## Prerequisites
-- LINE Bot MCP must be connected (`mcp__line-bot__*` tools available)
-- No browser needed — MCP handles everything via API
+## Limitation
 
-## Flow
+LINE Bot MCP can **send** messages (broadcast/push) but **cannot read** incoming messages — LINE's Messaging API requires a webhook server to receive events. Without a webhook, the agent cannot detect when someone sends a question.
 
-### 1. Check for new messages
+## Workaround options (in priority order)
 
-Use LINE Bot MCP tools to check for recent messages or webhook events.
+### Option A: Computer Use MCP + LINE desktop app (if installed)
 
-Note: LINE's messaging model is event-driven (webhook-based). Without a webhook server, the MCP may not be able to retrieve incoming messages directly. In this case:
+If the user has the LINE desktop app installed on macOS:
 
-**Option A (if MCP has message reading capability):**
-Use the appropriate MCP tool to list recent messages/events.
+1. `request_access` for LINE app
+2. `open_application` → "LINE"
+3. `screenshot` to see chat list
+4. Look for unread messages from the Weekly Report Agent chat
+5. `click` on the chat
+6. `screenshot` to read the message
+7. Compose grounded answer
+8. `type` the answer + `key` → `Return` to send
 
-**Option B (fallback — Chrome DevTools MCP):**
-If LINE Bot MCP cannot read incoming messages, use Chrome DevTools MCP to check the LINE OA Manager chat page:
-1. `navigate_page` → `https://chat.line.biz/account/@214lbnja`
-2. `take_snapshot` to see chat list
-3. Look for chats with unread messages
+### Option B: Notify user to check manually
 
-### 2. Read each question
+If neither Computer Use nor LINE desktop is available:
 
-For each new message, extract:
-- The user's display name
-- The question text
-- Timestamp
+```
+📭 LINE inbound Q&A is not available in this session.
+   LINE Bot MCP can send but cannot read incoming messages.
+   Please check LINE manually for any questions.
+```
 
-### 3. Compose a grounded answer
-
-Using the **last report's raw data**:
+## Grounding rules (same as email Q&A)
 - Only reference items from raw data
 - Cite specific items
-- If cannot answer: "抱歉，這個問題超出目前週報的資料範圍。建議直接聯繫相關人員。"
 - Never fabricate
-
-### 4. Send the reply
-
-Use LINE Bot MCP push message tool to reply to the user (need their user ID from the incoming message event).
-
-### When no messages found
-
-```
-📭 No new questions found in LINE messages.
-```
-
-## Fallback
-
-If LINE Bot MCP is not connected, skip LINE Q&A with a warning.
+- If cannot answer: "抱歉，這個問題超出目前週報的資料範圍。建議直接聯繫相關人員。"
