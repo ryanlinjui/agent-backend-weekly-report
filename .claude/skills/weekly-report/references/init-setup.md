@@ -63,9 +63,23 @@ For Claude Desktop, merge into `~/Library/Application Support/Claude/claude_desk
 
 **Notion MCP** (plugin): Print `⚠️ Run /mcp → connect Notion plugin`
 
-**Chrome DevTools MCP** (plugin): Print `⚠️ Run /plugin → install chrome-devtools-mcp`
-
 **GitHub**: Print `⚠️ Run 'gh auth login' in terminal`
+
+**LINE Webhook** (for inbound Q&A):
+```bash
+# Start webhook server
+python3 .claude/skills/weekly-report/scripts/line-webhook.py &
+
+# Start tunnel (tries npx localtunnel first, falls back to ssh localhost.run)
+bash .claude/skills/weekly-report/scripts/tunnel.sh 8765
+
+# Set webhook URL via LINE API
+curl -s -X PUT "https://api.line.me/v2/bot/channel/webhook/endpoint" \
+  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"endpoint": "{TUNNEL_URL}"}'
+```
+This is fully automated — no user action needed.
 
 ### Ask user for remaining manual steps
 
