@@ -1,46 +1,45 @@
 # Fetch Slack Messages
 
-Read the producer's messages from Slack channels in the report window.
+Read the producer's messages from Slack using the User OAuth Token and search API.
 
 ## Prerequisites
-- `SLACK_BOT_TOKEN` must be set in `.env`
-- The bot must be invited to the relevant channels (use Slack API `conversations.join` if needed)
+- `SLACK_USER_TOKEN` must be set in `.env` (a `xoxp-` token with `search:read` scope)
+- No bot join needed — User Token has access to all channels the producer is a member of
 
 ## Steps
 
-### 1. List channels the bot can see
+### 1. Search for producer's messages in the window
+
+Use the Slack `search.messages` API with the User Token. This searches across ALL channels the user has access to — no need to list/join channels individually.
 
 ```bash
-curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  "https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=200" \
-  | python3 -c "import sys,json; data=json.load(sys.stdin); [print(f\"{c['id']} {c['name']}\") for c in data.get('channels',[])]"
+curl -s -G "https://slack.com/api/search.messages" \
+  -H "Authorization: Bearer $SLACK_USER_TOKEN" \
+  --data-urlencode "query=from:me after:{W_start}" \
+  --data-urlencode "sort=timestamp" \
+  --data-urlencode "count=50"
 ```
 
-### 2. For each channel, fetch messages in the window
+`from:me` filters to the authenticated user's own messages. `after:{W_start}` filters by date.
 
-Substitute `{OLDEST}` with the Unix timestamp of `W_start` (compute via `date -j -f "%Y-%m-%d" "{W_start}" "+%s"` on macOS or `date -d "{W_start}" "+%s"` on Linux):
+### 2. Parse results
 
-```bash
-curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  "https://slack.com/api/conversations.history?channel={CHANNEL_ID}&oldest={OLDEST}&limit=200"
-```
+The response contains `messages.matches[]` with:
+- `channel.name` — which channel
+- `ts` — timestamp
+- `text` — message content
+- `permalink` — link to the message
 
-### 3. Filter for producer's messages
+Keep the raw matches. Do NOT summarize yet — that happens at the draft step.
 
-From the response JSON, filter `messages` where `user` matches the producer's Slack user ID. To find the producer's user ID:
+### 3. If search returns too many results
 
-```bash
-curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  "https://slack.com/api/users.list" \
-  | python3 -c "import sys,json; data=json.load(sys.stdin); [print(f\"{m['id']} {m['real_name']}\") for m in data.get('members',[]) if not m.get('is_bot')]"
-```
-
-Look for the producer's name (Ryan Lin / ryanlinjui) in the output. Use that user ID to filter messages.
+If more than 50 messages, paginate using `page=2`, `page=3`, etc. until all messages in the window are fetched.
 
 ### 4. Output format
 
-Keep the raw messages with: channel name, timestamp, text content. Do NOT summarize yet — that happens at the draft step.
+Keep raw messages with: channel name, timestamp, text content, permalink. Do NOT summarize yet.
 
 ## Fallback
 
-If `SLACK_BOT_TOKEN` is not set or API returns an error, print a warning and skip Slack source. Do not fail the entire pipeline.
+If `SLACK_USER_TOKEN` is not set, try `SLACK_BOT_TOKEN` as fallback (but bot needs to be in the channels). If neither is set, skip Slack source with a warning. Do not fail the entire pipeline.
