@@ -38,6 +38,14 @@ If it fails with auth error → EMAIL_PASSWORD needs setup (see 0c).
 
 If everything ✅, return to SKILL.md pipeline.
 
+**If ANY service is ❌, DO NOT proceed. Fix it immediately:**
+- Email ❌ → run Step 0c (email App Password setup)
+- MCP ❌ → run Step 0b (auto-install / prompt user to connect)
+- GitHub ❌ → run `gh auth login --web`
+- LINE webhook ❌ → start webhook server + tunnel
+
+**Keep fixing until ALL services are ✅.** Only then return to the pipeline. Never skip a broken service.
+
 ## 0b: Auto-install missing MCP servers
 
 ### Detect environment
@@ -218,10 +226,16 @@ If no manual steps needed, skip to verification.
 
 Wait for "ok" / "done" / "好了" — only if manual steps exist.
 
-## 0e: Verify
+## 0e: Verify (loop until all pass)
 
-Re-run health check from 0a. If all ✅, return to pipeline.
-For Claude Desktop: `⚠️ Please restart Claude Desktop to apply MCP changes, then say "ok".`
+Re-run health check from 0a. 
+
+- If all ✅ → return to pipeline.
+- If any ❌ → go back to the corresponding fix step (0b/0c). **Do NOT proceed with broken services.**
+- Loop: fix → re-check → fix → re-check until ALL ✅.
+- For Claude Desktop: `⚠️ Please restart Claude Desktop to apply MCP changes, then say "ok".`
+
+**This is a hard gate. The pipeline MUST NOT start with any service in ❌ state.**
 
 ## User interaction principle
 

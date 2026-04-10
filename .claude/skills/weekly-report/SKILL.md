@@ -14,7 +14,7 @@ Produce a weekly report from GitHub, Slack, and Notion, then deliver via Email a
 
 Read and follow [references/init-setup.md](references/init-setup.md).
 
-Load `.env` config, check all services, auto-install missing MCP servers. User only needs to connect MCPs on first run.
+Load `.env` config, check all services. **If ANY service is ❌, STOP and fix it immediately before proceeding.** Do NOT skip broken services — run the corresponding init/repair flow (0b/0c) until the service is ✅, then re-check. Only proceed to Step 1 when ALL services are ✅.
 
 ### Step 1: Check `gh` auth
 
