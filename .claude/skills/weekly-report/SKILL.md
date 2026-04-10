@@ -47,25 +47,27 @@ If everything is ✅, proceed to Step 1.
 
 If any service is ❌, automatically start the init flow for those services.
 
-**Open ALL needed browser windows at once** using Playwright MCP, then ask the user to log in to all of them in one go:
+Check which MCPs are connected and guide the user to connect missing ones:
 
 ```
-⚠️ Some services need setup. I've opened browser windows for:
-  - Gmail (https://mail.google.com) — please log in
-  - Slack (https://api.slack.com/apps) — please log in
-  - LINE OA Manager (https://manager.line.biz) — please log in
+⚠️ Some services need setup:
+  - Slack MCP: run /mcp → connect Slack
+  - Notion MCP: run /mcp → connect Notion
+  - LINE Bot MCP: run /mcp → connect line-bot
+  - Chrome DevTools MCP: run /mcp → connect chrome-devtools (for Gmail)
+  - GitHub: run 'gh auth login' in terminal
 
-Please log in to all of them, then say "ok".
+Please connect them, then say "ok".
 ```
 
 **Wait for user to say "ok" / "done" / "好了".** This is the ONLY user interaction needed for init.
 
-After user confirms login:
-1. **Gmail**: verify Playwright can access inbox. Save `GMAIL_USER` to `.env` if not set.
-2. **Slack**: if `SLACK_USER_TOKEN` is missing, navigate to the Slack App OAuth page → add User Token Scopes (`search:read`, `channels:history`, `channels:read`) → Reinstall → copy the `xoxp-` token → save to `.env`. All done via Playwright, no user action needed.
-3. **LINE**: if `LINE_CHANNEL_ACCESS_TOKEN` is missing, navigate to LINE Developers Console → create Provider + Messaging API channel (or find existing) → Issue channel access token → save to `.env`. All done via Playwright.
-4. **Notion**: check if Notion MCP tools are available. If not, print `⚠️ Notion MCP not connected — run /mcp to reconnect. Skipping Notion for this report.`
-5. **GitHub**: if `gh auth status` fails, print `⚠️ Run 'gh auth login' in terminal.` and wait for user to confirm.
+After user confirms:
+1. **Gmail**: verify Chrome DevTools MCP is connected and can access Gmail. User must be logged into Gmail in their Chrome browser.
+2. **Slack**: verify Slack MCP is connected. Test with a search query.
+3. **Notion**: verify Notion MCP is connected. Test with a meeting notes query.
+4. **LINE**: verify LINE Bot MCP is connected. Test with a bot info query.
+5. **GitHub**: verify `gh auth status` passes.
 
 After all init is complete, re-run the health check to confirm all ✅, then proceed to Step 1.
 
@@ -206,41 +208,32 @@ Then WAIT for the user's reply.
 
 Send the approved report to every configured output channel. Each channel is independent — if one fails, continue to the next.
 
-#### 8a: Email via Playwright Gmail
+#### 8a: Email via Chrome DevTools MCP
 
-Read and follow `references/send-gmail.md` (below).
+Use **Chrome DevTools MCP** to send via Gmail in the user's existing Chrome browser (already logged in — no separate login needed).
 
-Use **Playwright MCP tools** to send via Gmail web:
-
-1. `browser_navigate` → `https://mail.google.com/mail/u/0/#inbox?compose=new`
-2. Wait for compose window (`browser_snapshot` to confirm)
-3. `browser_type` To → each address from `REPORT_RECIPIENTS` (press Enter after each)
-4. `browser_type` Subject → `Weekly Report — {W_start} to {W_end}`
-5. `browser_type` Body → the clean plain-text version of the draft
-6. `browser_click` Send
+1. `navigate_page` → `https://mail.google.com/mail/u/0/#inbox?compose=new`
+2. `take_snapshot` to confirm compose window appeared
+3. `fill` or `click` the **To** field → type each address from `REPORT_RECIPIENTS`
+4. `fill` the **Subject** field → `Weekly Report — {W_start} to {W_end}`
+5. `fill` the **Message Body** → the clean plain-text version of the draft
+6. `click` the **Send** button
 
 On success: print `✅ Email sent to {REPORT_RECIPIENTS}`
 On failure: print error + `❌ Email send failed.`
 
-**Important:** `GMAIL_USER` must be logged in on the Playwright browser. If Gmail shows a login page, tell the user to log in and retry.
+If Chrome DevTools MCP is not connected, skip with: `⚠️ Chrome DevTools MCP not available. Skipping email.`
 
-#### 8b: LINE via Messaging API
+#### 8b: LINE via LINE Bot MCP
 
-Read and follow `references/send-line.md`.
+Use **LINE Bot MCP** (`mcp__line-bot__*` tools) to broadcast the report to all followers.
 
-Use the broadcast API to send to ALL bot followers at once (no user IDs needed):
+Use the broadcast tool to send the clean plain-text version of the draft as a text message. LINE text messages have a 5000 char limit — split at section boundaries if needed.
 
-```bash
-curl -s -X POST "https://api.line.me/v2/bot/message/broadcast" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer {LINE_CHANNEL_ACCESS_TOKEN}" \
-  -d '{"messages":[{"type":"text","text":"{REPORT_PLAIN_TEXT}"}]}'
-```
-
-If `LINE_CHANNEL_ACCESS_TOKEN` is empty, skip with: `⚠️ LINE not configured. Skipping LINE delivery.`
-
-On success (`{}` response): print `✅ LINE broadcast sent to all followers`
+On success: print `✅ LINE broadcast sent to all followers`
 On failure: print error.
+
+If LINE Bot MCP is not connected, skip with: `⚠️ LINE Bot MCP not available. Skipping LINE delivery.`
 
 ### Step 9: Summary
 
@@ -270,12 +263,12 @@ Automated Q&A check for weekly-report skill.
 
 Read .env for config. Check for inbound questions:
 
-1. EMAIL: Use Playwright MCP to open Gmail and search for unread replies with subject containing "Re: Weekly Report". For each reply, read the question, compose a grounded answer using GitHub/Slack/Notion data (re-fetch if needed), and reply via Gmail. Follow references/inbound-qa-email.md.
+1. EMAIL: Use Chrome DevTools MCP to open Gmail and search for unread replies with subject containing "Re: Weekly Report". For each reply, read the question, compose a grounded answer using GitHub/Slack/Notion data (re-fetch if needed), and reply via Gmail. Follow references/inbound-qa-email.md.
 
-2. LINE: Use Playwright MCP to check LINE OA Manager chat at https://chat.line.biz/account/@214lbnja for unread messages. For each message, compose a grounded answer and reply. Follow references/inbound-qa-line.md.
+2. LINE: Use LINE Bot MCP to check for and reply to messages. Follow references/inbound-qa-line.md.
 
 Grounding rules: only reference items from raw data. Never fabricate. If you cannot answer, say so honestly.
-If Playwright MCP or Notion MCP is not available, skip with a warning.
+If any MCP is not available, skip that channel with a warning.
 Be autonomous — do not ask for confirmation.
 Print a summary at the end.
 ```
