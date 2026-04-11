@@ -1,92 +1,82 @@
 # Inbound Q&A — LINE
 
-Receive and respond to LINE messages via a local webhook server + tunnel.
+Read and respond to LINE messages via LINE OA Manager Chat page using Playwright headless.
 
 ## Architecture
 
 ```
-LINE user sends message
-  → LINE server POSTs to webhook URL
-  → tunnel (localtunnel or ssh) forwards to localhost
-  → scripts/line-webhook.py saves to /tmp/line-inbox.json
-  → QA polling reads inbox file → composes grounded answer
-  → LINE Bot MCP push_text_message replies to user
+QA polling runs every ~30s:
+  playwright-headless opens chat.line.biz (invisible, already logged in)
+  → reads unread messages
+  → composes grounded answer
+  → types reply in chat UI + clicks Send (free, no quota)
+  → closes
+
+User sees: nothing. Browser is headless.
 ```
 
-## Setup (auto-init during Step 0)
+## Prerequisites
 
-### 1. Start webhook server
+- `playwright-headless` MCP must be connected (headless, shared session with `playwright-login`)
+- User must have logged in to LINE OA Manager at least once via `playwright-login` (headed, visible)
+- Chat must be enabled in LINE OA Manager Response Settings
 
-```bash
-python3 .claude/skills/weekly-report/scripts/line-webhook.py &
+## Login (first time only)
+
+If not logged in yet, use `playwright-login` (headed — browser visible):
+
+```
+playwright-login: browser_navigate → https://chat.line.biz/account/@214lbnja
 ```
 
-Listens on port 8765 by default. Saves messages to `/tmp/line-inbox.json`.
-
-### 2. Start tunnel
-
-Try in order (handles missing npx):
-
-```bash
-# Option A: npx localtunnel (if npx available)
-npx -y localtunnel --port 8765
-
-# Option B: ssh tunnel (if npx not available, ssh is everywhere)
-ssh -o StrictHostKeyChecking=no -R 80:localhost:8765 nokey@localhost.run
+Tell user:
+```
+🌐 LINE Chat login page opened. Please log in, then say "ok".
 ```
 
-Or use helper: `bash .claude/skills/weekly-report/scripts/tunnel.sh 8765`
+After login, the session is saved. Switch to `playwright-headless` for all subsequent operations.
 
-Capture the public URL from output.
+## QA check flow (headless — invisible)
 
-### 3. Set LINE webhook URL
+### 1. Open chat page
 
-```bash
-curl -s -X PUT "https://api.line.me/v2/bot/channel/webhook/endpoint" \
-  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"endpoint\": \"{TUNNEL_URL}\"}"
+```
+playwright-headless: browser_navigate → https://chat.line.biz/account/@214lbnja
+playwright-headless: browser_snapshot → see chat list
 ```
 
-### 4. Verify webhook
+### 2. Find unread chats
 
-```bash
-curl -s -X POST "https://api.line.me/v2/bot/channel/webhook/test" \
-  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"endpoint\": \"{TUNNEL_URL}\"}"
+Look for chat entries with unread indicators. Click each one.
+
+### 3. Read messages
+
+```
+playwright-headless: browser_snapshot → read the conversation
 ```
 
-Should return `{"success": true}`.
+Extract the user's latest message (the question).
 
-## Reading incoming messages
+### 4. Compose grounded answer
 
-Read `/tmp/line-inbox.json`. Each entry:
-
-```json
-{
-  "timestamp": "2026-04-11T04:30:00",
-  "user_id": "U1234...",
-  "reply_token": "abc123...",
-  "text": "Collaboration Network 那個 PR 改了什麼？",
-  "handled": false
-}
-```
-
-Filter for `"handled": false`.
-
-## Replying
-
-Use LINE Bot MCP `push_text_message` with the user's `user_id`:
-
-After replying, mark the message as `"handled": true` in the inbox file.
-
-## Grounding rules
-
+Using the last report's raw data:
 - Only reference items from raw data
-- Cite specific items
-- Never fabricate
+- Cite specific PRs, issues, Slack messages, Notion pages
 - If cannot answer: "抱歉，這個問題超出目前週報的資料範圍。建議直接聯繫相關人員。"
+- Never fabricate
+
+### 5. Reply via chat UI (free)
+
+```
+playwright-headless: browser_type → answer text in the message input box
+playwright-headless: browser_click → Send button
+```
+
+This uses LINE's chat reply mechanism — **free, no quota consumed**.
+
+### 6. Move to next chat
+
+Repeat for all unread chats.
 
 ## When no messages found
 
@@ -94,6 +84,10 @@ After replying, mark the message as `"handled": true` in the inbox file.
 📭 No new questions found in LINE messages.
 ```
 
-## Cleanup
+## MCP selection rule
 
-When session closes, the webhook server and tunnel die automatically (background processes). `/tmp/line-inbox.json` persists but is harmless.
+| Situation | Use | Why |
+|---|---|---|
+| User needs to log in | `playwright-login` (headed) | User must see browser to type password |
+| Automated Q&A polling | `playwright-headless` | Invisible, user doesn't see anything |
+| Both share session dir | `/tmp/playwright-session` | Login persists across headed↔headless |
