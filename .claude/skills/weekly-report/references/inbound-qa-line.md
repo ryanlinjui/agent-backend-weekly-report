@@ -1,63 +1,75 @@
 # Inbound Q&A — LINE
 
-Read and respond to LINE messages via LINE OA Manager Chat page using Playwright headless.
+Receive and respond to LINE messages via cloudflared webhook + LINE Bot MCP push reply.
 
 ## Architecture
 
 ```
-QA polling runs every ~30s:
-  playwright-headless opens chat.line.biz (invisible, already logged in)
-  → reads unread messages
-  → composes grounded answer
-  → types reply in chat UI + clicks Send (free, no quota)
-  → closes
-
-User sees: nothing. Browser is headless.
+LINE user sends message
+  → LINE server POSTs to cloudflared tunnel URL
+  → cloudflared forwards to localhost:8765
+  → scripts/line-webhook.py saves to /tmp/line-inbox.json
+  → QA polling reads inbox → composes grounded answer
+  → LINE Bot MCP push_text_message replies to user
 ```
 
-## Prerequisites
+## Auto-start during init (Step 0)
 
-- `playwright-headless` MCP must be connected (headless, shared session with `playwright-login`)
-- User must have logged in to LINE OA Manager at least once via `playwright-login` (headed, visible)
-- Chat must be enabled in LINE OA Manager Response Settings
+All fully automated — no user action:
 
-## Login (first time only)
+```bash
+# 1. Start webhook server
+python3 .claude/skills/weekly-report/scripts/line-webhook.py &
 
-If not logged in yet, use `playwright-login` (headed — browser visible):
+# 2. Start cloudflared tunnel
+cloudflared tunnel --url http://localhost:8765 2>&1 | tee /tmp/cloudflared.log &
+sleep 5
+TUNNEL_URL=$(grep -o 'https://[^ ]*\.trycloudflare\.com' /tmp/cloudflared.log | head -1)
 
-```
-playwright-login: browser_navigate → https://chat.line.biz/account/@214lbnja
-```
+# 3. Set + activate LINE webhook
+curl -s -X PUT "https://api.line.me/v2/bot/channel/webhook/endpoint" \
+  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"endpoint\": \"$TUNNEL_URL\"}"
 
-Tell user:
-```
-🌐 LINE Chat login page opened. Please log in, then say "ok".
-```
-
-After login, the session is saved. Switch to `playwright-headless` for all subsequent operations.
-
-## QA check flow (headless — invisible)
-
-### 1. Open chat page
-
-```
-playwright-headless: browser_navigate → https://chat.line.biz/account/@214lbnja
-playwright-headless: browser_snapshot → see chat list
+# 4. Verify
+curl -s -X POST "https://api.line.me/v2/bot/channel/webhook/test" \
+  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"endpoint\": \"$TUNNEL_URL\"}"
+# Must return {"success": true}
 ```
 
-### 2. Find unread chats
-
-Look for chat entries with unread indicators. Click each one.
-
-### 3. Read messages
-
-```
-playwright-headless: browser_snapshot → read the conversation
+If cloudflared is not installed, auto-install:
+```bash
+# macOS
+brew install cloudflared
+# Linux
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
 ```
 
-Extract the user's latest message (the question).
+## QA check flow
 
-### 4. Compose grounded answer
+### 1. Read inbox
+
+```bash
+cat /tmp/line-inbox.json
+```
+
+Each entry:
+```json
+{
+  "timestamp": "2026-04-11T15:25:50",
+  "user_id": "Uc7e0b36...",
+  "reply_token": "a9335e9f...",
+  "text": "這週做了什麼",
+  "handled": false
+}
+```
+
+Filter for `"handled": false`.
+
+### 2. Compose grounded answer
 
 Using the last report's raw data:
 - Only reference items from raw data
@@ -65,18 +77,23 @@ Using the last report's raw data:
 - If cannot answer: "抱歉，這個問題超出目前週報的資料範圍。建議直接聯繫相關人員。"
 - Never fabricate
 
-### 5. Reply via chat UI (free)
+### 3. Reply via LINE Bot MCP
+
+Use `push_text_message` with the user's `user_id`:
 
 ```
-playwright-headless: browser_type → answer text in the message input box
-playwright-headless: browser_click → Send button
+LINE Bot MCP: push_text_message
+  userId: "{user_id from inbox}"
+  message: {type: "text", text: "{grounded answer}"}
 ```
 
-This uses LINE's chat reply mechanism — **free, no quota consumed**.
+### 4. Mark as handled
 
-### 6. Move to next chat
+Update `/tmp/line-inbox.json` — set `"handled": true` for the replied message.
 
-Repeat for all unread chats.
+### 5. Next message
+
+Repeat for all unhandled messages.
 
 ## When no messages found
 
@@ -84,10 +101,6 @@ Repeat for all unread chats.
 📭 No new questions found in LINE messages.
 ```
 
-## MCP selection rule
+## Cleanup
 
-| Situation | Use | Why |
-|---|---|---|
-| User needs to log in | `playwright-login` (headed) | User must see browser to type password |
-| Automated Q&A polling | `playwright-headless` | Invisible, user doesn't see anything |
-| Both share session dir | `/tmp/playwright-session` | Login persists across headed↔headless |
+When session closes, webhook server and cloudflared die automatically (background processes). `/tmp/line-inbox.json` persists but is harmless.

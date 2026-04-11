@@ -29,7 +29,7 @@ Auto-check all services, auto-install missing MCPs, and fix broken services on e
 | Slack | Slack MCP plugin | ❌ |
 | Notion | Notion MCP plugin | ❌ |
 | LINE send | LINE Bot MCP | ❌ |
-| LINE QA (read + reply) | Chrome DevTools → Playwright headless (fallback) | chat.line.biz |
+| LINE QA (read + reply) | cloudflared webhook → LINE Bot MCP push | localhost:8765 |
 | Email send | `email-client.py` (SMTP) | ❌ |
 | Email QA (read + reply) | `email-client.py` (IMAP) | ❌ |
 | Email init (App Password) | `playwright-login` (Google blocks Chrome DevTools on login) | ✅ login only |
@@ -80,7 +80,32 @@ claude mcp add-json line-bot '{"type":"stdio","command":"/Users/ryanlinjui/.nvm/
 - Check: `gh auth status`
 - If fail: run `gh auth login --web` (auto-opens browser)
 
-After installing any MCP, verify it's connected before continuing.
+**Cloudflared** (needed for LINE webhook):
+- Check: `which cloudflared`
+- If missing: auto-install:
+```bash
+# macOS
+brew install cloudflared
+# Linux
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
+```
+
+**LINE Webhook** (auto-start, no user action):
+```bash
+# Start webhook server
+python3 .claude/skills/weekly-report/scripts/line-webhook.py &
+# Start cloudflared tunnel
+cloudflared tunnel --url http://localhost:8765 2>&1 | tee /tmp/cloudflared.log &
+sleep 5
+TUNNEL_URL=$(grep -o 'https://[^ ]*\.trycloudflare\.com' /tmp/cloudflared.log | head -1)
+# Set LINE webhook URL
+curl -s -X PUT "https://api.line.me/v2/bot/channel/webhook/endpoint" \
+  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"endpoint\": \"$TUNNEL_URL\"}"
+```
+
+After installing any MCP/tool, verify it's connected before continuing.
 
 ## 0b: Health check
 
@@ -89,11 +114,12 @@ Run all checks. Print:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 Service health check
-  GitHub:  ✅ / ❌
-  Email:   ✅ / ❌
-  Slack:   ✅ / ❌
-  Notion:  ✅ / ❌
-  LINE:    ✅ / ❌
+  GitHub:   ✅ / ❌
+  Email:    ✅ / ❌
+  Slack:    ✅ / ❌
+  Notion:   ✅ / ❌
+  LINE:     ✅ / ❌
+  Webhook:  ✅ / ❌ (cloudflared + webhook server)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -107,7 +133,7 @@ python3 .claude/skills/weekly-report/scripts/email-client.py send \
 - Email ❌ → run Step 0c
 - MCP ❌ → re-run Step 0a (auto-install)
 - GitHub ❌ → `gh auth login --web`
-- LINE webhook ❌ → start webhook server + tunnel
+- Webhook ❌ → start `line-webhook.py` + `cloudflared tunnel` + set LINE webhook URL
 
 **Loop until ALL ✅. Never skip.**
 
