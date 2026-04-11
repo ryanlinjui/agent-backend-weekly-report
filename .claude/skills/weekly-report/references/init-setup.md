@@ -2,16 +2,38 @@
 
 Auto-check all services, auto-install missing MCPs, and fix broken services on every run.
 
-## MCP tool selection
+## Browser MCP selection rules
 
-| Purpose | MCP to use | Why |
+### Priority: Chrome DevTools MCP first, Playwright as fallback
+
+1. **Try Chrome DevTools MCP first** for all browser operations
+2. **If Chrome DevTools fails** (not connected, Google blocks it, auth issue) → **fallback to Playwright**
+3. **Playwright has two modes:**
+   - `playwright-login` (headed/visible) — ONLY when user needs to log in or interact
+   - `playwright-headless` (invisible) — for all automated operations (QA polling, reading pages)
+4. Both Playwright modes share session dir `/tmp/playwright-session` — login persists
+
+### When to show vs hide browser
+
+| Situation | Tool | Visible? |
 |---|---|---|
-| Email init (Google login page) | **Playwright MCP** | Google blocks Chrome DevTools on login pages |
-| Other browser ops (post-login) | **Chrome DevTools MCP** | Faster, connects to existing Chrome |
-| Slack | **Slack MCP plugin** | Native API, no browser |
-| Notion | **Notion MCP plugin** | Native API, no browser |
-| LINE send | **LINE Bot MCP** | Native API, no browser |
-| GitHub | **`gh` CLI** | Already authenticated |
+| User needs to log in / type password | `playwright-login` | ✅ Yes |
+| Automated page reading (QA polling) | `playwright-headless` or Chrome DevTools | ❌ No |
+| Google login pages (email init) | `playwright-login` | ✅ Yes (Chrome DevTools blocked by Google) |
+| Post-login settings pages | Chrome DevTools (first) → Playwright headless (fallback) | ❌ No |
+
+### Service MCP selection
+
+| Service | MCP | Browser needed? |
+|---|---|---|
+| Slack | Slack MCP plugin | ❌ |
+| Notion | Notion MCP plugin | ❌ |
+| LINE send | LINE Bot MCP | ❌ |
+| LINE QA (read + reply) | Chrome DevTools → Playwright headless (fallback) | chat.line.biz |
+| Email send | `email-client.py` (SMTP) | ❌ |
+| Email QA (read + reply) | `email-client.py` (IMAP) | ❌ |
+| Email init (App Password) | `playwright-login` (Google blocks Chrome DevTools on login) | ✅ login only |
+| GitHub | `gh` CLI | ❌ |
 
 ## Required config (.env)
 
