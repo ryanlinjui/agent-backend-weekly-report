@@ -133,18 +133,36 @@ open_url() {
 
 Google/Microsoft/Yahoo/Apple detect automated browsers (`--enable-automation` flag) and block login with "This browser or app may not be secure." This affects ALL browser automation tools (Chrome DevTools MCP, Playwright, Puppeteer). 
 
-**Solution:** Use `open` (macOS) / `xdg-open` (Linux) / `start` (Windows) to open pages in the **user's normal browser** — no automation flag, no detection.
+**Solution:** Open a **fresh Chrome profile** (no history, no cookies, no automation flag). Google sees it as a normal new browser, not automation.
 
 ```bash
+# Profile dir — reusable across init sessions
+CHROME_PROFILE="/tmp/weekly-report-chrome-profile"
+
 open_url() {
   case "$(uname -s)" in
-    Darwin) open "$1" ;;
-    Linux)  xdg-open "$1" 2>/dev/null || echo "Please open: $1" ;;
-    MINGW*|MSYS*) start "$1" 2>/dev/null || echo "Please open: $1" ;;
-    *)      echo "Please open: $1" ;;
+    Darwin)
+      open -na "Google Chrome" --args --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
+        || open -na "Chromium" --args --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
+        || open "$1"
+      ;;
+    Linux)
+      google-chrome --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
+        || chromium --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
+        || xdg-open "$1"
+      ;;
+    MINGW*|MSYS*)
+      start chrome --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
+        || start "$1"
+      ;;
+    *)
+      echo "Please open: $1"
+      ;;
   esac
 }
 ```
+
+This opens a **clean Chrome window** with zero browsing history. No `--enable-automation` flag = Google won't block it. The profile is saved at `/tmp/weekly-report-chrome-profile` so subsequent `open_url` calls reuse the same logged-in session within this init flow.
 
 ### Step 1: Login + 2FA
 
