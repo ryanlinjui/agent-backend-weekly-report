@@ -142,25 +142,22 @@ Provider URLs:
 - yahoo.com → `https://login.yahoo.com`
 - icloud.com / me.com → `https://appleid.apple.com`
 
-If the page shows an email input field: skill fills it with `EMAIL_USER` via `fill`, then clicks Next.
+**Do NOT fill any fields on the login page.** Do not type the email, password, or click any buttons. Automated input on login pages triggers security detection (Google blocks it).
 
-If the page shows a password field: **STOP and ask user.**
+Print:
 ```
-🔐 Please enter your password on the browser page, then say "ok".
+🌐 Login page opened.
+   Please log in and complete any verification, then say "ok".
 ```
-**Wait for "ok".** This is the only reason to pause — skill cannot and should not handle the user's main password.
 
-### Step 2: Handle 2FA / phone verification
+**Wait for "ok".** User handles the entire login flow themselves (email, password, 2FA, CAPTCHA — everything on the login page).
 
-After login, `take_snapshot` to check what page we're on:
+### Step 2: Confirm login succeeded
 
-- **If on a 2FA prompt (SMS code, authenticator, etc.):** STOP and ask user.
-  ```
-  📱 Phone verification needed. Complete it on the browser page, then say "ok".
-  ```
-  **Wait for "ok".**
+After user says "ok", `take_snapshot` to verify we're on a logged-in page (account dashboard, not still on login).
 
-- **If already logged in (account page / dashboard):** proceed silently to Step 3.
+- If still on login page → print `⚠️ Still on login page. Please complete login, then say "ok".` → wait again
+- If logged in → proceed silently to Step 3
 
 ### Step 3: Navigate to 2FA settings and ensure it's ON
 
@@ -215,16 +212,16 @@ If fail → retry from Step 4.
 
 ### Summary of when to pause vs. auto-drive
 
-| Page shows | Skill does | Ask user? |
+| Page | Skill does | Ask user? |
 |---|---|---|
-| Email input | Fill with EMAIL_USER, click Next | ❌ |
-| Password input | — | ✅ "Please enter password" |
-| SMS / phone verification | — | ✅ "Please complete verification" |
-| CAPTCHA | — | ✅ "Please solve CAPTCHA" |
-| 2FA settings page | Click buttons, navigate | ❌ |
+| **Login page (email/password/2FA)** | **NOTHING — do not touch** | ✅ User does ALL login |
+| 2FA settings page (after login) | Click buttons, navigate | ❌ |
+| 2FA phone setup (enter phone #) | — | ✅ User enters phone + verifies |
 | App Password creation | Fill name, click Create, read result | ❌ |
 | App Password displayed | Read + save to .env | ❌ |
-| Any other clickable UI | Click it | ❌ |
+| Any other post-login UI | Click it | ❌ |
+
+**Rule: login page = hands off. Post-login pages = skill drives.**
 
 ## 0d: Combine manual steps
 
