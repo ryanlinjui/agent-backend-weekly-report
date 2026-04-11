@@ -1,12 +1,12 @@
 ---
 name: weekly-report
-description: Generate and send a weekly report summarizing the producer's activity across GitHub, Slack, and Notion. Delivers via Email (Gmail) and LINE. Use when the user asks for "weekly report", "週報", "my week in review", or similar. Drafts against a fixed template, shows in chat for approval, sends only after explicit confirmation.
-compatibility: Requires gh CLI, Chrome browser (for Gmail), and MCP servers (Slack, Notion, LINE Bot, Chrome DevTools).
+description: Generate and send a weekly report summarizing the producer's activity across GitHub, Slack, and Notion. Delivers via Email, LINE, and LinkedIn DM. Use when the user asks for "weekly report", "週報", "my week in review", or similar. Drafts against a fixed template, shows in chat for approval, sends only after explicit confirmation.
+compatibility: Requires gh CLI and MCP servers (Slack, Notion, LINE Bot, LinkedIn). Optional: Chrome DevTools, Playwright, cloudflared.
 ---
 
 # Weekly Report Skill
 
-Produce a weekly report from GitHub, Slack, and Notion, then deliver via Email and LINE with a mandatory approval gate.
+Produce a weekly report from GitHub, Slack, and Notion, then deliver via Email, LINE, and LinkedIn DM with a mandatory approval gate.
 
 ## Pipeline
 
@@ -61,8 +61,9 @@ Read [assets/approval-gate-template.md](assets/approval-gate-template.md), subst
 
 ### Step 8: Send
 
-- **8a: Email** — follow [references/send-email.md](references/send-email.md) (osascript + Mail.app, no MCP needed)
-- **8b: LINE** — follow [references/send-line.md](references/send-line.md)
+- **8a: Email** — follow [references/send-email.md](references/send-email.md) (IMAP/SMTP via email-client.py)
+- **8b: LINE** — follow [references/send-line.md](references/send-line.md) (LINE Bot MCP broadcast)
+- **8c: LinkedIn** — follow [references/send-linkedin.md](references/send-linkedin.md) (LinkedIn MCP DM)
 
 Each channel is independent — if one fails, continue to the next.
 
@@ -71,8 +72,9 @@ Each channel is independent — if one fails, continue to the next.
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Delivery Summary
-  Email: ✅ / ❌
-  LINE:  ✅ / ❌ / ⚠️ not configured
+  Email:    ✅ / ❌
+  LINE:     ✅ / ❌ / ⚠️ not configured
+  LinkedIn: ✅ / ❌ / ⚠️ not configured
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
