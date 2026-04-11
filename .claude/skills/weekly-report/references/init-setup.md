@@ -1,6 +1,17 @@
 # Init & Health Check
 
-Auto-check all services and install missing MCP servers on first run.
+Auto-check all services, auto-install missing MCPs, and fix broken services on every run.
+
+## MCP tool selection
+
+| Purpose | MCP to use | Why |
+|---|---|---|
+| Email init (Google login page) | **Playwright MCP** | Google blocks Chrome DevTools on login pages |
+| Other browser ops (post-login) | **Chrome DevTools MCP** | Faster, connects to existing Chrome |
+| Slack | **Slack MCP plugin** | Native API, no browser |
+| Notion | **Notion MCP plugin** | Native API, no browser |
+| LINE send | **LINE Bot MCP** | Native API, no browser |
+| GitHub | **`gh` CLI** | Already authenticated |
 
 ## Required config (.env)
 
@@ -11,138 +22,90 @@ Auto-check all services and install missing MCP servers on first run.
 | `REPORT_WINDOW_DAYS` | Days to look back (default: 7) | Non-empty |
 | `EMAIL_USER` | Email account (any provider) | Non-empty |
 | `EMAIL_PASSWORD` | App Password for IMAP/SMTP | SMTP test succeeds |
-| `SLACK_USER_TOKEN` | Slack User Token for search | `curl` auth.test returns OK |
-| `LINE_CHANNEL_ACCESS_TOKEN` | LINE Messaging API | `curl` bot/info returns OK |
 
-## 0a: Health check
+## 0a: Auto-install missing MCPs FIRST
 
-Run all checks in parallel. Print:
+Before health check, verify all required MCPs are installed. **If any are missing, install them automatically and continue.** Do NOT ask the user — just install and proceed.
+
+### Check + auto-install each MCP
+
+**Playwright MCP** (needed for email init):
+- Check: are `mcp__plugin_playwright_playwright__*` tools available?
+- If missing: `claude mcp add-json playwright '{"type":"stdio","command":"npx","args":["-y","@playwright/mcp@latest"]}'`
+- Then reconnect via the tool system
+
+**Chrome DevTools MCP** (needed for post-login browser ops):
+- Check: are `mcp__plugin_chrome-devtools-mcp_chrome-devtools__*` tools available?
+- If missing: run `/plugin` install, or `claude mcp add-json chrome-devtools '{"type":"stdio","command":"npx","args":["-y","chrome-devtools-mcp@latest"]}'`
+
+**Slack MCP** (plugin):
+- Check: are `mcp__plugin_slack_slack__*` tools available?
+- If missing: tell user `⚠️ Run /mcp → connect Slack plugin, then say "ok".` → wait
+
+**Notion MCP** (plugin):
+- Check: are `mcp__plugin_Notion_notion__*` tools available?
+- If missing: tell user `⚠️ Run /mcp → connect Notion plugin, then say "ok".` → wait
+
+**LINE Bot MCP**:
+- Check: are `mcp__line-bot__*` tools available?
+- If missing: auto-install:
+```bash
+claude mcp add-json line-bot '{"type":"stdio","command":"/Users/ryanlinjui/.nvm/versions/node/v24.14.0/bin/line-bot-mcp-server","args":[],"env":{"CHANNEL_ACCESS_TOKEN":"<read from .env>"}}'
+```
+- For Claude Desktop, merge into `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+**GitHub**:
+- Check: `gh auth status`
+- If fail: run `gh auth login --web` (auto-opens browser)
+
+After installing any MCP, verify it's connected before continuing.
+
+## 0b: Health check
+
+Run all checks. Print:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔍 Service health check
-  GitHub:  ✅ / ❌ (gh auth status)
-  Email:   ✅ / ❌ (SMTP auth test)
-  Slack:   ✅ / ❌ (Slack MCP connected)
-  Notion:  ✅ / ❌ (Notion MCP connected)
-  LINE:    ✅ / ❌ (LINE Bot MCP connected)
+  GitHub:  ✅ / ❌
+  Email:   ✅ / ❌
+  Slack:   ✅ / ❌
+  Notion:  ✅ / ❌
+  LINE:    ✅ / ❌
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-To test email, run:
+Email test:
 ```bash
 python3 .claude/skills/weekly-report/scripts/email-client.py send \
   --to "$EMAIL_USER" --subject "test" --body-file /dev/null
 ```
-If it fails with auth error → EMAIL_PASSWORD needs setup (see 0c).
-
-If everything ✅, return to SKILL.md pipeline.
 
 **If ANY service is ❌, DO NOT proceed. Fix it immediately:**
-- Email ❌ → run Step 0c (email App Password setup)
-- MCP ❌ → run Step 0b (auto-install / prompt user to connect)
-- GitHub ❌ → run `gh auth login --web`
+- Email ❌ → run Step 0c
+- MCP ❌ → re-run Step 0a (auto-install)
+- GitHub ❌ → `gh auth login --web`
 - LINE webhook ❌ → start webhook server + tunnel
 
-**Keep fixing until ALL services are ✅.** Only then return to the pipeline. Never skip a broken service.
+**Loop until ALL ✅. Never skip.**
 
-## 0b: Auto-install missing MCP servers
+## 0c: Email App Password setup (Playwright only)
 
-### Detect environment
-
-- Claude Code: `claude --version` succeeds → use `claude mcp add-json`
-- Claude Desktop: `~/Library/Application Support/Claude/claude_desktop_config.json` exists → edit with Write tool
-
-### Install each missing MCP
-
-**LINE Bot MCP** (if `mcp__line-bot__*` tools not available):
-```bash
-# Claude Code:
-claude mcp add-json line-bot '{"type":"stdio","command":"npx","args":["@line/line-bot-mcp-server"],"env":{"CHANNEL_ACCESS_TOKEN":"<read from .env>"}}'
-```
-For Claude Desktop, merge into `~/Library/Application Support/Claude/claude_desktop_config.json`:
-```json
-{
-  "mcpServers": {
-    "line-bot": {
-      "command": "npx",
-      "args": ["@line/line-bot-mcp-server"],
-      "env": {
-        "CHANNEL_ACCESS_TOKEN": "<read from .env>"
-      }
-    }
-  }
-}
-```
-
-**Slack MCP** (plugin): If not connected, print `⚠️ Slack MCP needed.` and auto-open Slack auth:
-```bash
-# macOS
-open "https://slack.com/oauth/v2/authorize"
-```
-Then tell user: `🌐 Slack auth page opened. Authorize, then run /mcp to connect.`
-
-**Notion MCP** (plugin): If not connected, tell user: `⚠️ Run /mcp → connect Notion plugin, then say "ok".`
-
-**GitHub**: If `gh auth status` fails, auto-start login:
-```bash
-gh auth login --web
-```
-This opens the browser automatically. User just clicks authorize.
-
-**LINE Webhook** (for inbound Q&A):
-```bash
-# Start webhook server
-python3 .claude/skills/weekly-report/scripts/line-webhook.py &
-
-# Start tunnel (tries npx localtunnel first, falls back to ssh localhost.run)
-bash .claude/skills/weekly-report/scripts/tunnel.sh 8765
-
-# Set webhook URL via LINE API
-curl -s -X PUT "https://api.line.me/v2/bot/channel/webhook/endpoint" \
-  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"endpoint": "{TUNNEL_URL}"}'
-```
-This is fully automated — no user action needed.
-
-## 0c: Email setup (if EMAIL_PASSWORD missing or auth fails)
-
-Most email providers (Gmail, Outlook, Yahoo, iCloud) require an App Password for IMAP/SMTP.
-
-**We never store the user's main password.** Only the App Password (a separate, revocable token generated by the provider).
-
-### Helper: open URL in user's default browser
-
-```bash
-open_url() {
-  case "$(uname -s)" in
-    Darwin) open "$1" ;;
-    Linux)  xdg-open "$1" 2>/dev/null || echo "Please open: $1" ;;
-    MINGW*|MSYS*) start "$1" 2>/dev/null || echo "Please open: $1" ;;
-    *)      echo "Please open: $1" ;;
-  esac
-}
-```
+**Use Playwright MCP for this entire flow.** Google blocks Chrome DevTools on login pages.
 
 ### Core principle
 
-**Skill drives the browser at ALL times.** After each action, `take_snapshot` to see the result and decide the next action. Only pause and ask the user when something **physically requires them** (typing their password, phone SMS code, CAPTCHA). Never print instructions for things the skill can click/fill itself.
+**Skill drives the browser at ALL times.** Only pause for: password input, phone SMS, CAPTCHA. Never print instructions for things the skill can click itself.
 
-### Step 1: Open login page
+**Login page = hands off (user types). Post-login = skill drives.**
+
+### Step 1: Open login page via Playwright
 
 ```
-Playwright MCP: navigate_page → {LOGIN_URL}
-Playwright MCP: take_snapshot → see what's on screen
+Playwright MCP: browser_navigate → https://myaccount.google.com/apppasswords
 ```
 
-Provider URLs:
-- gmail.com / Google Workspace → `https://accounts.google.com/signin`
-- outlook.com / hotmail.com → `https://login.live.com`
-- yahoo.com → `https://login.yahoo.com`
-- icloud.com / me.com → `https://appleid.apple.com`
-
-**Do NOT fill any fields on the login page.** Do not type the email, password, or click any buttons. Automated input on login pages triggers security detection (Google blocks it).
+This redirects to login if needed. User logs in + 2FA in the Playwright browser.
 
 Print:
 ```
@@ -150,110 +113,85 @@ Print:
    Please log in and complete any verification, then say "ok".
 ```
 
-**Wait for "ok".** User handles the entire login flow themselves (email, password, 2FA, CAPTCHA — everything on the login page).
+**Wait for "ok".**
 
-### Step 2: Confirm login succeeded
+### Step 2: Confirm login + check page
 
-After user says "ok", `take_snapshot` to verify we're on a logged-in page (account dashboard, not still on login).
+`browser_snapshot` to verify. If on App Passwords page → skip to Step 4. If on 2FA setup page → Step 3. If still on login → ask user to retry.
 
-- If still on login page → print `⚠️ Still on login page. Please complete login, then say "ok".` → wait again
-- If logged in → proceed silently to Step 3
+### Step 3: Enable 2FA (if needed)
 
-### Step 3: Navigate to 2FA settings and ensure it's ON
-
-Skill drives — no user interaction:
-
+Skill auto-drives:
 ```
-Playwright MCP: navigate_page → https://myaccount.google.com/signinoptions/two-step-verification
-Playwright MCP: take_snapshot → check if 2FA is "On" or needs setup
+Playwright: browser_navigate → https://myaccount.google.com/signinoptions/two-step-verification
+Playwright: browser_snapshot → check status
 ```
 
-- If 2FA is ON → proceed to Step 4
-- If 2FA is OFF → skill clicks "Turn on" / "Get started" button → `take_snapshot`
-  - If it asks for phone number: **STOP** → `📱 Please enter your phone number and verify, then say "ok".` → wait → re-check
-  - If it asks for other verification: **STOP** → tell user what to do → wait
-  - After user confirms → `take_snapshot` → verify 2FA is now ON
+- 2FA ON → Step 4
+- 2FA OFF → skill clicks "Turn on" / navigates to phone setup
+  - Phone number input → **STOP**: `📱 Enter phone number and verify, then say "ok".` → wait
+  - After verify → skill clicks "Turn on 2-Step Verification" → confirm ON
 
-### Step 4: Create App Password automatically
-
-Skill drives — no user interaction:
+### Step 4: Create App Password (fully automated)
 
 ```
-Playwright MCP: navigate_page → https://myaccount.google.com/apppasswords
-Playwright MCP: take_snapshot → see the App Passwords page
+Playwright: browser_navigate → https://myaccount.google.com/apppasswords
+Playwright: browser_snapshot
+Playwright: browser_type → "weekly-report" in App name field
+Playwright: browser_click → Create button
+Playwright: browser_snapshot → read the 16-character password from the page
 ```
 
-Then:
-1. `fill` the "App name" field → type `weekly-report`
-2. `click` the "Create" button
-3. `take_snapshot` → read the generated 16-character App Password from the page
-4. Extract the password text from the snapshot
-
-**No user interaction.** Skill reads the password directly from the page.
-
-For Outlook/Yahoo/iCloud: adapt navigation + clicks to each provider's UI. Same principle: skill clicks everything, user only types passwords/verification codes.
+**No user interaction.** Skill reads the password directly.
 
 ### Step 5: Save + verify
 
-Save the App Password to `.env`:
-```bash
-# Write EMAIL_PASSWORD=<extracted 16-char password> to .env
-```
+Save App Password to `.env` as `EMAIL_PASSWORD`.
 
-Auto-send test email:
+Test:
 ```bash
 python3 .claude/skills/weekly-report/scripts/email-client.py send \
   --to "$EMAIL_USER" --subject "Weekly Report — email test" \
-  --body-file <(echo "If you see this, email is configured correctly.")
+  --body-file <(echo "Email configured successfully.")
 ```
 
 If OK → `✅ Email configured.`
 If fail → retry from Step 4.
 
-### Summary of when to pause vs. auto-drive
+### When to pause vs. auto-drive
 
 | Page | Skill does | Ask user? |
 |---|---|---|
-| **Login page (email/password/2FA)** | **NOTHING — do not touch** | ✅ User does ALL login |
-| 2FA settings page (after login) | Click buttons, navigate | ❌ |
-| 2FA phone setup (enter phone #) | — | ✅ User enters phone + verifies |
-| App Password creation | Fill name, click Create, read result | ❌ |
+| **Login page** | **NOTHING** | ✅ User does ALL login |
+| 2FA settings (post-login) | Click buttons, navigate | ❌ |
+| 2FA phone setup | — | ✅ User enters phone + verifies |
+| App Password page | Fill name, click Create, read result | ❌ |
 | App Password displayed | Read + save to .env | ❌ |
-| Any other post-login UI | Click it | ❌ |
 
-**Rule: login page = hands off. Post-login pages = skill drives.**
+## 0d: LINE webhook (for inbound Q&A)
 
-## 0d: Combine manual steps
-
-After all auto-installs, print ONE message for remaining manual steps:
-
+Fully automated — no user action:
+```bash
+python3 .claude/skills/weekly-report/scripts/line-webhook.py &
+bash .claude/skills/weekly-report/scripts/tunnel.sh 8765
+# Set webhook URL via LINE API
+curl -s -X PUT "https://api.line.me/v2/bot/channel/webhook/endpoint" \
+  -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"endpoint": "{TUNNEL_URL}"}'
 ```
-⚠️ First-time setup (one-time only):
-  {list only items that still need user action}
 
-Please complete these, then say "ok".
-```
+## 0e: Final verify (loop)
 
-If no manual steps needed, skip to verification.
+Re-run health check. If all ✅ → return to pipeline. If any ❌ → fix → re-check. Loop until all pass.
 
-Wait for "ok" / "done" / "好了" — only if manual steps exist.
+**Hard gate. Pipeline MUST NOT start with any ❌.**
 
-## 0e: Verify (loop until all pass)
+## User interaction
 
-Re-run health check from 0a. 
-
-- If all ✅ → return to pipeline.
-- If any ❌ → go back to the corresponding fix step (0b/0c). **Do NOT proceed with broken services.**
-- Loop: fix → re-check → fix → re-check until ALL ✅.
-- For Claude Desktop: `⚠️ Please restart Claude Desktop to apply MCP changes, then say "ok".`
-
-**This is a hard gate. The pipeline MUST NOT start with any service in ❌ state.**
-
-## User interaction principle
-
-User only interacts for **three things** during the entire `/weekly-report` flow:
-1. **First-run setup** — connect MCPs + paste App Password (once only)
-2. **Logging in** — if email/MCP sessions expire (rare)
+User only interacts for:
+1. **Login** — email password + phone 2FA on Playwright browser (once)
+2. **MCP connect** — Slack/Notion plugins if not auto-installable (once)
 3. **Approving the report** — review draft → send
 
-Everything else is automated.
+Everything else (MCP installation, 2FA setup, App Password creation, webhook, token saving) is automated.
