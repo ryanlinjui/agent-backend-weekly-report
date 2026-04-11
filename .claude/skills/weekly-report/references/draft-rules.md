@@ -25,3 +25,7 @@ You may only reference items that appear verbatim in raw output from ANY source 
 - **Empty window:** TL;DR says `本週無活動紀錄。`, all other sections omitted.
 - **Source unavailable:** add at bottom: `⚠️ Note: {source} data was unavailable for this report.`
 - Replace `{START_DATE}` and `{END_DATE}` in template with actual dates.
+
+## QA replies — voice profile
+
+When responding to inbound questions (Email/LINE/LinkedIn QA), follow [references/voice-profile.md](voice-profile.md) to dynamically match the **current user's** communication style. The skill analyzes the user's Slack/LINE/LinkedIn messages to learn their tone, then replies as if the user wrote it themselves. Recipients should not be able to tell it's a bot.
