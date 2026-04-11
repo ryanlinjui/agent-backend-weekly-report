@@ -1,40 +1,64 @@
-# Send Report via LinkedIn
+# Send Report via LinkedIn DM
 
-Send the weekly report as LinkedIn DM to specified recipients using LinkedIn MCP.
+Send the weekly report as LinkedIn DM using Playwright to operate LinkedIn web.
+
+## Why Playwright (not LinkedIn MCP send_message)
+
+LinkedIn MCP's `send_message` has a known bug (composer_unavailable, GitHub issue #344). Playwright directly operating LinkedIn web is reliable and tested.
 
 ## Prerequisites
-- LinkedIn MCP must be connected (`mcp__linkedin__*` tools available)
-- First-time use: LinkedIn MCP opens a browser for login. User logs in once, session persists in `~/.linkedin-mcp`
-- `LINKEDIN_RECIPIENTS` in `.env` — comma-separated LinkedIn profile URLs or names
+- `playwright-login` or `playwright-headless` MCP connected
+- User must have logged into LinkedIn via `playwright-login` at least once (session persists in `.browser-session/`)
+- `LINKEDIN_RECIPIENTS` in `.env` — comma-separated LinkedIn profile URLs
 
 ## Steps
 
-### 1. Send to each recipient
+### 1. Get recipient profile URN
 
-For each recipient in `LINKEDIN_RECIPIENTS`:
+For each recipient URL in `LINKEDIN_RECIPIENTS`, extract the username (e.g., `takalawang` from `https://www.linkedin.com/in/takalawang/`).
 
-Use `mcp__linkedin__send_message` to send the clean plain-text version of the report.
+Use LinkedIn MCP to get the profile URN:
+```
+LinkedIn MCP: get_person_profile → linkedin_username
+→ extract profile_urn (e.g., ACoAAD1LUtAB1e5fY_YuC3JaUT_tsBHVMGyDY_8)
+```
 
-If the recipient is specified by name, first use `mcp__linkedin__search_people` to find their profile, then send.
+### 2. Open compose page
 
-### 2. Result
+```
+Playwright: browser_navigate → https://www.linkedin.com/messaging/compose/?recipient={profile_urn}
+```
+
+Use `playwright-headless` for automated sends (invisible). Use `playwright-login` only if login is needed.
+
+### 3. Type and send
+
+```
+Playwright: browser_snapshot → find "Write a message…" textbox
+Playwright: browser_click → click the textbox
+Playwright: browser_type → type the clean plain-text report
+Playwright: browser_click → click "Send" button
+```
+
+### 4. Verify
+
+If URL changes to `messaging/thread/...` → message sent successfully.
 
 On success: print `✅ LinkedIn DM sent to {recipient}`
 On failure: print error, continue to next recipient.
 
+## First-time login
+
+If Playwright shows LinkedIn login page:
+1. Switch to `playwright-login` (headed/visible)
+2. User logs in
+3. Session saved to `.browser-session/` — persists across sessions
+4. Switch back to `playwright-headless` for automated operations
+
 ## LinkedIn QA (inbound)
 
-Use `mcp__linkedin__get_inbox` and `mcp__linkedin__get_conversation` to check for replies to the report. Same grounding rules as email/LINE QA.
+Use LinkedIn MCP `get_inbox` and `get_conversation` to check for replies. If a reply contains a question, compose a grounded answer and send via Playwright (same flow as above).
 
 ## Fallback
 
-If LinkedIn MCP is not connected, skip with: `⚠️ LinkedIn MCP not available. Skipping LinkedIn delivery.`
-
-## First-time login
-
-LinkedIn MCP uses Patchright (Playwright fork) with persistent browser profiles. On first use:
-1. MCP opens a browser window for LinkedIn login
-2. User logs in (handles 2FA if needed)
-3. Session saved to `~/.linkedin-mcp` — no re-login needed
-
-This is automatic — no manual setup required.
+If neither Playwright nor LinkedIn MCP can send, skip with: `⚠️ LinkedIn not available. Skipping LinkedIn delivery.`
