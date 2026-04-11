@@ -129,96 +129,71 @@ open_url() {
 
 **Skill drives the browser at ALL times.** After each action, `take_snapshot` to see the result and decide the next action. Only pause and ask the user when something **physically requires them** (typing their password, phone SMS code, CAPTCHA). Never print instructions for things the skill can click/fill itself.
 
-### Why `open` command, not Chrome DevTools MCP
+### Step 1: Open login page
 
-Google/Microsoft/Yahoo/Apple detect automated browsers (`--enable-automation` flag) and block login with "This browser or app may not be secure." This affects ALL browser automation tools (Chrome DevTools MCP, Playwright, Puppeteer). 
-
-**Solution:** Open a **fresh Chrome profile** (no history, no cookies, no automation flag). Google sees it as a normal new browser, not automation.
-
-```bash
-# Profile dir — reusable across init sessions
-CHROME_PROFILE="/tmp/weekly-report-chrome-profile"
-
-open_url() {
-  case "$(uname -s)" in
-    Darwin)
-      open -na "Google Chrome" --args --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
-        || open -na "Chromium" --args --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
-        || open "$1"
-      ;;
-    Linux)
-      google-chrome --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
-        || chromium --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
-        || xdg-open "$1"
-      ;;
-    MINGW*|MSYS*)
-      start chrome --user-data-dir="$CHROME_PROFILE" "$1" 2>/dev/null \
-        || start "$1"
-      ;;
-    *)
-      echo "Please open: $1"
-      ;;
-  esac
-}
+```
+Playwright MCP: navigate_page → {LOGIN_URL}
+Playwright MCP: take_snapshot → see what's on screen
 ```
 
-This opens a **clean Chrome window** with zero browsing history. No `--enable-automation` flag = Google won't block it. The profile is saved at `/tmp/weekly-report-chrome-profile` so subsequent `open_url` calls reuse the same logged-in session within this init flow.
+Provider URLs:
+- gmail.com / Google Workspace → `https://accounts.google.com/signin`
+- outlook.com / hotmail.com → `https://login.live.com`
+- yahoo.com → `https://login.yahoo.com`
+- icloud.com / me.com → `https://appleid.apple.com`
 
-### Step 1: Login + 2FA
-
-Open login page in user's browser:
-
-```bash
-# Gmail / Google Workspace
-open_url "https://accounts.google.com/signin"
-# Outlook
-open_url "https://login.live.com"
-# Yahoo
-open_url "https://login.yahoo.com"
-# iCloud
-open_url "https://appleid.apple.com"
-```
+**Do NOT fill any fields on the login page.** Do not type the email, password, or click any buttons. Automated input on login pages triggers security detection (Google blocks it).
 
 Print:
 ```
-🌐 Login page opened in your browser.
-   Log in and complete any verification, then say "ok".
+🌐 Login page opened.
+   Please log in and complete any verification, then say "ok".
 ```
 
-**Wait for "ok".**
+**Wait for "ok".** User handles the entire login flow themselves (email, password, 2FA, CAPTCHA — everything on the login page).
 
-### Step 2: Open 2FA settings page
+### Step 2: Confirm login succeeded
 
-```bash
-# Gmail
-open_url "https://myaccount.google.com/signinoptions/two-step-verification"
+After user says "ok", `take_snapshot` to verify we're on a logged-in page (account dashboard, not still on login).
+
+- If still on login page → print `⚠️ Still on login page. Please complete login, then say "ok".` → wait again
+- If logged in → proceed silently to Step 3
+
+### Step 3: Navigate to 2FA settings and ensure it's ON
+
+Skill drives — no user interaction:
+
+```
+Playwright MCP: navigate_page → https://myaccount.google.com/signinoptions/two-step-verification
+Playwright MCP: take_snapshot → check if 2FA is "On" or needs setup
 ```
 
-Print:
-```
-🌐 2FA settings page opened.
-   Enable 2FA if not already on, then say "ok".
-   (If already enabled, just say "ok".)
-```
+- If 2FA is ON → proceed to Step 4
+- If 2FA is OFF → skill clicks "Turn on" / "Get started" button → `take_snapshot`
+  - If it asks for phone number: **STOP** → `📱 Please enter your phone number and verify, then say "ok".` → wait → re-check
+  - If it asks for other verification: **STOP** → tell user what to do → wait
+  - After user confirms → `take_snapshot` → verify 2FA is now ON
 
-**Wait for "ok".**
+### Step 4: Create App Password automatically
 
-### Step 3: Open App Password page
+Skill drives — no user interaction:
 
-```bash
-# Gmail
-open_url "https://myaccount.google.com/apppasswords"
 ```
-
-Print:
-```
-🌐 App Password page opened.
-   Create one named "weekly-report", then paste the 16-character password here.
+Playwright MCP: navigate_page → https://myaccount.google.com/apppasswords
+Playwright MCP: take_snapshot → see the App Passwords page
 ```
 
-**Wait for user to paste the App Password.** This is the one thing the user has to copy — Google shows it once and there's no API to retrieve it without browser automation (which Google blocks).
+Then:
+1. `fill` the "App name" field → type `weekly-report`
+2. `click` the "Create" button
+3. `take_snapshot` → read the generated 16-character App Password from the page
+4. Extract the password text from the snapshot
 
-### Step 4: Save + verify
+**No user interaction.** Skill reads the password directly from the page.
+
+For Outlook/Yahoo/iCloud: adapt navigation + clicks to each provider's UI. Same principle: skill clicks everything, user only types passwords/verification codes.
+
+### Step 5: Save + verify
 
 Save the App Password to `.env`:
 ```bash
@@ -239,15 +214,14 @@ If fail → retry from Step 4.
 
 | Page | Skill does | Ask user? |
 |---|---|---|
-| **Login page** | `open` command only | ✅ User does ALL login + 2FA |
-| **2FA settings** | `open` command | ✅ User enables 2FA |
-| **App Password page** | `open` command | ✅ User creates + pastes password |
-| **LINE console (non-Google)** | Chrome DevTools MCP drives | ❌ Skill does it |
-| **Slack/Notion** | MCP plugin auth | ❌ User just clicks authorize |
+| **Login page (email/password/2FA)** | **NOTHING — do not touch** | ✅ User does ALL login |
+| 2FA settings page (after login) | Click buttons, navigate | ❌ |
+| 2FA phone setup (enter phone #) | — | ✅ User enters phone + verifies |
+| App Password creation | Fill name, click Create, read result | ❌ |
+| App Password displayed | Read + save to .env | ❌ |
+| Any other post-login UI | Click it | ❌ |
 
-**Rule: Google/email pages = `open` command (user's browser, no automation). Non-Google pages = skill can automate.**
-
-**Why user must paste App Password:** Google displays the password once on a page inside the user's normal browser. Skill cannot read that browser (no automation access to it). This is the ONE manual copy-paste in the entire init flow.
+**Rule: login page = hands off. Post-login pages = skill drives.**
 
 ## 0d: Combine manual steps
 
