@@ -1,3 +1,4 @@
 .env
+.claude/
 .playwright-mcp/
-.claude/skills/weekly-report/.browser-session/
+.browser-session/
