@@ -7,6 +7,9 @@
 
 Use `ToolSearch` to find available browser tools (search `navigate` or `browser_navigate`). Try ALL found tools in order: Chrome DevTools → Playwright login → Playwright headless → Claude in Chrome. **NEVER stop after one fails. NEVER show manual instructions without trying ALL.** Tool names vary by environment — do not hardcode them.
 
+### Headed vs headless
+- **Login page only** → headed/visible browser
+- **ALL other operations** → headless. User should NOT see any browser window for automated steps.
 ## Check
 
 Are `mcp__linkedin__*` tools available?

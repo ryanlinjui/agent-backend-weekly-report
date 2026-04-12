@@ -26,6 +26,10 @@ When you need to open a URL, you MUST try ALL available browser tools before giv
 - **NEVER ask user "which browser tool should I use?"** — just try them all silently.
 - After one succeeds, use the same tool family for subsequent actions (click, type, snapshot).
 
+### Headed vs headless
+- **Login page (user must type password)** → use headed/visible browser (Playwright login or Chrome DevTools)
+- **ALL other pages (post-login automation)** → use **headless** browser. User should NOT see any browser window for automated steps like navigating to 2FA settings, creating App Password, reading the generated password, etc.
+
 ## Init steps
 
 ### 1. Open login page

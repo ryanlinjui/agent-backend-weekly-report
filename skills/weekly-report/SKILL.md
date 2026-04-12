@@ -82,4 +82,5 @@ Print delivery summary (✅ / ❌ / ⚠️ per channel).
 4. Never re-fetch during regenerate.
 5. Never hardcode config — read from `.env`.
 6. Never ask user to choose during init — auto-do everything, only pause for physical interaction (password, SMS, `/mcp`).
-7. **Browser fallback chain** — for ANY browser operation, use `ToolSearch` to find ALL available browser tools (search `navigate`), then try each one in order: Chrome DevTools → Playwright login → Playwright headless → Claude in Chrome. **NEVER stop after one fails — try ALL before giving manual instructions.** Tool names vary by environment (plugin prefix etc.) — do NOT hardcode them.
+7. **Browser fallback chain** — use `ToolSearch` to find ALL available browser tools (search `navigate`), try each in order. **NEVER stop after one fails — try ALL before manual instructions.** Tool names vary by environment — do NOT hardcode.
+8. **Headless by default** — only show a visible browser window when the user MUST physically type (login password, SMS code). All other browser operations (navigating settings, clicking buttons, reading pages, creating tokens) MUST use headless/invisible browser. User should never see a browser window pop up for automated steps.
