@@ -89,11 +89,32 @@ python3 scripts/email-client.py send \
   --body-file <(echo "If you see this, email is working.")
 ```
 
-If OK → `✅ Email configured.`
+If OK → proceed to step 7.
 If fail → retry from step 5.
+
+### 7. Confirm recipients
+
+If `REPORT_RECIPIENTS` is empty in `.env`:
+```
+Who should receive the weekly report by email? (comma-separated addresses)
+```
+Save to `.env` as `REPORT_RECIPIENTS`.
+
+### 8. Test send to recipients
+
+Send a test email to each recipient in `REPORT_RECIPIENTS`:
+```bash
+python3 scripts/email-client.py send \
+  --to "{RECIPIENT}" --subject "Weekly Report — test delivery" \
+  --body-file <(echo "This is a test. If you see this, email delivery is configured.")
+```
+
+If OK → `✅ Email configured. Test sent to {RECIPIENT}.`
+If fail → explain the error to user (e.g., "invalid address", "SMTP rejected") → ask to fix or skip this recipient.
 
 ## User interaction
 
 - Login page: user types password + 2FA (once)
 - Phone verification: user enters phone number (once, if 2FA not enabled)
+- Provide recipient email addresses (once)
 - Everything else: skill auto-drives

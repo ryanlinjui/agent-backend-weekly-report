@@ -6,25 +6,25 @@ compatibility: Requires gh CLI. MCP servers auto-installed during init (Slack, N
 
 # Weekly Report Skill
 
-Two modes:
+Three modes:
 - **Weekly report** — generate + approve + send
 - **Q&A** — check for inbound questions and reply in the producer's voice
+- **Config** — add/change recipients, re-init services, update `.env`
 
 ## Weekly Report Pipeline
 
 ### Step 0: Init & health check
 
-Read `.env` — if missing or incomplete, create it by running each service's init. The pipeline depends on these keys being valid:
-
-```
-GITHUB_USERNAME, EMAIL_USER, EMAIL_PASSWORD,
-LINE_CHANNEL_ACCESS_TOKEN, LINKEDIN_RECIPIENTS, REPORT_RECIPIENTS, REPORT_WINDOW_DAYS
-```
-
-For each missing/invalid key, follow its init reference to obtain it:
+Read `.env`. For each missing/invalid key, follow its init reference:
 [init-github.md](references/init-github.md) · [init-email.md](references/init-email.md) · [init-slack.md](references/init-slack.md) · [init-notion.md](references/init-notion.md) · [init-line.md](references/init-line.md) · [init-linkedin.md](references/init-linkedin.md)
 
-Also verify MCP connections (Slack, Notion, LINE Bot, LinkedIn) are live. Print result using [assets/health-check-template.md](assets/health-check-template.md). Do NOT proceed until ALL ✅.
+After all services are ✅, confirm recipients with the user:
+1. Read `REPORT_RECIPIENTS` (email), `LINKEDIN_RECIPIENTS` from `.env`
+2. Print current recipients and ask: **「報告會寄給以下收件人，確認嗎？」**
+3. If user wants to add/change → update `.env` → test send to new recipient → confirm delivery
+4. If any test send fails → explain the issue to user (e.g., "LinkedIn DM failed — not a 1st connection") → ask user how to proceed
+
+Print result using [assets/health-check-template.md](assets/health-check-template.md). Do NOT proceed until ALL ✅ + recipients confirmed.
 
 ### Step 1: Compute window & fetch raw data
 
@@ -107,6 +107,21 @@ Follow [references/inbound-qa-line.md](references/inbound-qa-line.md). Read mess
   LINE:  {N} questions answered
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
+
+---
+
+## Config Mode
+
+Run when user wants to change settings. Same as Step 0 init but interactive.
+
+Use when user says "config", "設定", "change recipients", "add recipient", "weekly-report-config", or similar.
+
+1. Show current `.env` settings (mask passwords)
+2. Ask what to change
+3. Update `.env`
+4. Test the changed service (send test to new recipient, verify MCP connection, etc.)
+5. If test fails → explain issue → ask user how to proceed
+6. Print updated health check
 
 ---
 

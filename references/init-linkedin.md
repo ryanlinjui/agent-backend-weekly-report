@@ -45,19 +45,22 @@ Who should receive the report on LinkedIn? (paste profile URLs, comma-separated)
 ```
 Save to `.env` as `LINKEDIN_RECIPIENTS`.
 
-### 4. Verify
+### 4. Verify connection
 
 ```
 LinkedIn MCP: get_inbox
 ```
-
 Must return inbox data (not a login error).
 
-Test sending (optional):
-```
-LinkedIn MCP: get_person_profile → linkedin_username from LINKEDIN_RECIPIENTS
-```
-Must return profile data.
+### 5. Test send to each recipient
+
+For each recipient in `LINKEDIN_RECIPIENTS`:
+1. `LinkedIn MCP: get_person_profile` → confirm they're a 1st connection (shows "Message" button)
+2. Send test via Playwright → LinkedIn compose → type "Weekly Report delivery test" → Send
+3. If sent → `✅ LinkedIn DM works for {recipient}.`
+4. If fails (not connected, composer unavailable) → explain to user: e.g., `⚠️ Cannot DM {recipient} — not a 1st connection. Send a connection request first?`
+   - If user says yes → `LinkedIn MCP: connect_with_person` → retry after connected
+   - If user says skip → remove from `LINKEDIN_RECIPIENTS` in `.env`
 
 ## User interaction
 
