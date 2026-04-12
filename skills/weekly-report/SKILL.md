@@ -27,7 +27,7 @@ First, read `config.json` (same folder as this SKILL.md) to check which services
 
 After Phase 1 services are ready, ask user ONE question:
 
-**「報告要寄給誰？請提供 Email 收件人、LinkedIn 個人檔案網址。」**（LINE 不用問，broadcast 自動寄給所有 followers）
+Ask (in detected language): who to send the report to? Provide Email recipients and LinkedIn profile URLs. (LINE uses broadcast to all followers — no need to ask.)
 
 Save to `config.json` as `REPORT_RECIPIENTS`, `LINKEDIN_RECIPIENTS`.
 

@@ -5,6 +5,8 @@ description: Check for and reply to questions about the weekly report. Use when 
 
 # Q&A
 
+Auto-detect user language from OS locale or their message. Use that language for all output.
+
 Read `config.json` from `skills/weekly-report/` to get recipients and tokens. Browser session is in `skills/weekly-report/.browser-session/` (loaded automatically via `.mcp.json`).
 
 1. Load raw data from last report (or re-fetch if not in memory)
