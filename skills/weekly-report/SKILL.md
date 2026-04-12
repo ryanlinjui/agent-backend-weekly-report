@@ -37,7 +37,7 @@ Use `playwright-login` to open each service. User logs in manually. Session auto
 
 | Service | URL | Done when |
 |---|---|---|
-| Gmail | `https://mail.google.com` | Inbox loads |
+| Email | User's email provider webmail (e.g. Gmail, Outlook, Yahoo) | Inbox loads |
 | LINE OA Manager | `https://manager.line.biz` | Dashboard loads |
 | LinkedIn | `https://www.linkedin.com` | Feed loads (or use LinkedIn MCP if available) |
 
@@ -67,7 +67,7 @@ Each channel independent — if one fails, try Chrome DevTools MCP as fallback, 
 
 | Channel | How |
 |---|---|
-| Email | Playwright headless → Gmail: Compose → fill To / Subject / Body → Send → screenshot sent confirmation |
+| Email | Playwright headless → open email webmail → Compose → fill To / Subject / Body → Send → screenshot sent confirmation |
 | LINE | LINE Bot MCP `broadcast_text_message` → then Playwright headless open LINE OA Manager chat to screenshot the sent message |
 | LinkedIn | Playwright headless → LinkedIn: open recipient profile → Message → send DM → screenshot sent confirmation |
 

@@ -11,7 +11,7 @@ Read `config.json` from `skills/weekly-report/` to get recipients and tokens. Br
 
 1. Load raw data from last report (or re-fetch if not in memory)
 2. Use `playwright-headless` for all operations — session auto-loaded from `skills/weekly-report/.browser-session/` via `.mcp.json`. If session expired (login page appears), switch to `playwright-login` for user to re-login, then back to headless. Fallback: Chrome DevTools MCP if Playwright fails.
-   - **Email**: Gmail inbox → search replies to "Weekly Report" → read and reply → screenshot
+   - **Email**: Open user's email inbox → search replies to "Weekly Report" → read and reply → screenshot
    - **LINE**: LINE OA Manager → Chat tab → check new messages → reply directly in chat → screenshot
 3. Show all screenshots to user as proof
 4. Print summary of questions answered
