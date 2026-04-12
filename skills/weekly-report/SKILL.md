@@ -14,7 +14,7 @@ Read `.env`. If missing or keys empty, create it. For each service, use `ToolSea
 | Service | How to check | If ❌ |
 |---|---|---|
 | GitHub | `gh auth status` | `gh auth login --web` |
-| Email | Test SMTP via `scripts/email-client.py` | Open App Password page with Playwright → user logs in → skill creates App Password automatically → save to `.env` |
+| Email | Test SMTP via `scripts/email-client.py` | See [references/init-email.md](references/init-email.md) — Playwright opens page, user logs in, skill creates App Password automatically |
 | Slack | Call any Slack MCP tool | System handles OAuth automatically |
 | Notion | Call any Notion MCP tool | System handles OAuth automatically |
 | LINE | Call LINE Bot MCP `get_message_quota` | See [references/init-line.md](references/init-line.md) |
