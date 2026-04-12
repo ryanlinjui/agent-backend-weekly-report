@@ -12,13 +12,14 @@ When you need to open a URL, you MUST try ALL available browser tools before giv
 
 ### How to find and try browser tools
 
-1. Use `ToolSearch` to find available browser tools: search for `navigate` or `browser_navigate` or `navigate_page`
-2. Try EVERY browser tool found, in this priority order:
-   - **Chrome DevTools** tools (names containing `chrome-devtools` + `navigate_page`)
-   - **Playwright login** tools (names containing `playwright-login` or `playwright` without `headless` + `browser_navigate`)
-   - **Playwright headless** tools (names containing `playwright-headless` + `browser_navigate`)
-   - **Claude in Chrome** tools (names containing `Claude_in_Chrome` + `navigate`)
-3. **ONLY after ALL browser tools have been tried and failed** → tell user to open URL manually
+1. Use `ToolSearch` to find available browser tools: search for `navigate`
+2. **ONLY use tools whose name contains `chrome-devtools` or `playwright`.** Ignore everything else.
+3. Try in this order:
+   - **Chrome DevTools** tools (name contains `chrome-devtools` + `navigate_page`)
+   - **Playwright login** tools (name contains `playwright` without `headless` + `browser_navigate`) — for login pages (visible)
+   - **Playwright headless** tools (name contains `playwright-headless` + `browser_navigate`) — for post-login automation (invisible)
+4. **DO NOT use:** "Claude in Chrome" tools, `open` bash command, `xdg-open`, or any tool not containing `chrome-devtools` or `playwright`
+5. **ONLY after Chrome DevTools + both Playwrights have been tried and failed** → tell user to open URL manually
 
 ### Rules
 - **NEVER stop after the first tool fails.** Try the next one immediately.
