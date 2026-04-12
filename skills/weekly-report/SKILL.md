@@ -83,4 +83,5 @@ Print delivery summary (✅ / ❌ / ⚠️ per channel).
 5. Never hardcode config — read from `.env`.
 6. Never ask user to choose during init — auto-do everything, only pause for physical interaction (password, SMS, `/mcp`).
 7. **Browser fallback chain** — use `ToolSearch` to find ALL available browser tools (search `navigate`), try each in order. **NEVER stop after one fails — try ALL before manual instructions.** Tool names vary by environment — do NOT hardcode.
-8. **Headless by default** — only show a visible browser window when the user MUST physically type (login password, SMS code). All other browser operations (navigating settings, clicking buttons, reading pages, creating tokens) MUST use headless/invisible browser. User should never see a browser window pop up for automated steps.
+8. **Headless by default** — only show a visible browser window when the user MUST physically type (login password, SMS code). All other browser operations MUST use headless/invisible browser.
+9. **NEVER use AskUserQuestion during init.** Do NOT show option menus, radio buttons, or skip buttons. Print plain text messages only. If user must act (login, /mcp), print a simple message and wait for their next message — do NOT create interactive UI elements.

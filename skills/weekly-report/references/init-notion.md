@@ -1,38 +1,29 @@
 # Init: Notion
 
-> **Rule:** NEVER ask the user to choose or make decisions. Try every approach automatically. If one fails, silently try the next. Only pause when user must physically act (password, SMS, /mcp). After they act, immediately continue.
+> **Rule:** NEVER ask the user to choose or make decisions. NEVER use AskUserQuestion. NEVER offer "skip" options. Print plain text only.
 
 ## Check
 
-Use `ToolSearch` to find Notion MCP tools (search `notion`). If found, test:
-```
-Notion MCP: notion-search → query: "meeting" page_size: 1
-```
-- If returns results → ✅ done.
-- If auth error or no tools → needs init.
+Use `ToolSearch` to find Notion MCP tools (search `notion`). If found, call one to test. If not found, the plugin's `.mcp.json` should have auto-configured it — retry after a moment.
 
 ## Init steps
 
 ### 1. Try calling Notion MCP tool directly
 
-Just call the tool. If OAuth is needed, the system automatically opens a browser for the user to authorize. Do NOT tell user to run `/mcp` first — try the tool call first and let the system handle auth.
+Call the tool immediately. If OAuth is needed, the system auto-opens a browser. Do NOT print instructions first — just call the tool and let the system handle auth.
 
-### 2. If no Notion MCP tools exist at all
+If the call succeeds → ✅ done. Move to next service.
 
-Only as last resort:
+If the call fails with auth error → the OAuth flow should have opened. Wait a moment and retry.
+
+### 2. If tools still not available after retry
+
+Print ONE line (plain text, no UI elements):
 ```
-⚠️ Notion MCP not available. Please run /mcp → connect Notion, then say "ok".
+Notion needs authorization — please complete the auth in the browser that opened, or run /mcp to connect Notion.
 ```
-Then retry step 1.
+Then wait for user's next message and retry. Do NOT use AskUserQuestion. Do NOT offer skip/ok buttons.
 
 ### 3. Verify
 
-```
-Notion MCP: notion-search → query: "meeting" page_size: 1
-```
-Must return results → `✅ Notion connected.`
-
-## User interaction
-
-- OAuth authorization in browser (automatic popup — user clicks Allow)
-- Only if MCP missing entirely: `/mcp` connect (once)
+Test with a search query. If returns results → `✅ Notion connected.` Move to next service immediately.
