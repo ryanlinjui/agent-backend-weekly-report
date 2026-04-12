@@ -1,0 +1,11 @@
+{
+  "name": "weekly-report",
+  "description": "Generate and send weekly reports from GitHub, Slack, and Notion. Delivers via Email, LINE, and LinkedIn DM.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ryan Lin",
+    "url": "https://github.com/ryanlinjui"
+  },
+  "repository": "https://github.com/ryanlinjui/agent-backend-weekly-report",
+  "license": "MIT"
+}
