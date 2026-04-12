@@ -1,88 +1,126 @@
 ---
 name: weekly-report
-description: Generate and send a weekly report summarizing the producer's activity across GitHub, Slack, and Notion. Delivers via Email, LINE, and LinkedIn DM. Use when the user asks for "weekly report", "週報", "my week in review", or similar. Drafts against a fixed template, shows in chat for approval, sends only after explicit confirmation.
-compatibility: Requires gh CLI and MCP servers (Slack, Notion, LINE Bot, LinkedIn). Optional: Chrome DevTools, Playwright, cloudflared.
+description: Generate and send a weekly report summarizing the producer's activity across GitHub, Slack, and Notion. Delivers via Email, LINE, and LinkedIn DM. Use when the user asks for "weekly report", "週報", "my week in review", or similar. Also handles inbound Q&A — run separately to check and reply to questions about the report.
+compatibility: Requires gh CLI. MCP servers auto-installed during init (Slack, Notion, LINE Bot, LinkedIn). Browser automation via Playwright for email setup. cloudflared for LINE webhook.
 ---
 
 # Weekly Report Skill
 
-Produce a weekly report from GitHub, Slack, and Notion, then deliver via Email, LINE, and LinkedIn DM with a mandatory approval gate.
+Two modes:
+- **Weekly report** — generate + approve + send
+- **Q&A** — check for inbound questions and reply in the producer's voice
 
-## Pipeline
+## Weekly Report Pipeline
 
 ### Step 0: Init & health check
 
 Read and follow [references/init-setup.md](references/init-setup.md).
 
-Load `.env` config, check all services. **If ANY service is ❌, STOP and fix it immediately before proceeding.** Do NOT skip broken services — run the corresponding init/repair flow (0b/0c) until the service is ✅, then re-check. Only proceed to Step 1 when ALL services are ✅.
+Check all services. **If ANY is ❌, fix it immediately** by following the corresponding init file:
+- [references/init-github.md](references/init-github.md)
+- [references/init-email.md](references/init-email.md)
+- [references/init-slack.md](references/init-slack.md)
+- [references/init-notion.md](references/init-notion.md)
+- [references/init-line.md](references/init-line.md)
+- [references/init-linkedin.md](references/init-linkedin.md)
 
-### Step 1: Check `gh` auth
+**Do NOT proceed until ALL services are ✅.**
 
-Run `gh auth status`. If it fails, print error and STOP.
+### Step 1: Compute the window
 
-### Step 2: Compute the window
+Read `.env` for `REPORT_WINDOW_DAYS` (default: 7).
 
-- `W_start` = now − `REPORT_WINDOW_DAYS` days (from `.env`), as `YYYY-MM-DD`
-- `W_end` = now, as `YYYY-MM-DD`
+- `W_start` = now − `REPORT_WINDOW_DAYS` days, formatted `YYYY-MM-DD`
+- `W_end` = now, formatted `YYYY-MM-DD`
 
-### Step 3: Fetch raw data from ALL sources
+### Step 2: Fetch raw data from ALL sources
 
-Fetch in order. Keep all raw output in working memory. If a source fails, warn and continue. STOP only if ALL fail.
+Fetch in order. Keep all raw output in working memory — do not summarize yet. If a source fails, warn and continue. STOP only if ALL sources fail.
 
-- **3a: GitHub** — follow [references/fetch-github.md](references/fetch-github.md)
-- **3b: Slack** — follow [references/fetch-slack.md](references/fetch-slack.md)
-- **3c: Notion** — follow [references/fetch-notion.md](references/fetch-notion.md)
+| Source | Reference | Tool |
+|---|---|---|
+| GitHub | [references/fetch-github.md](references/fetch-github.md) | `gh` CLI |
+| Slack | [references/fetch-slack.md](references/fetch-slack.md) | Slack MCP |
+| Notion | [references/fetch-notion.md](references/fetch-notion.md) | Notion MCP |
 
-### Step 4: Read the template
+### Step 3: Draft the report
 
-Read [assets/report-template.md](assets/report-template.md). Follow its sections, order, and emojis exactly.
+1. Read [assets/report-template.md](assets/report-template.md) — follow its sections, order, and emojis exactly.
+2. Follow [references/draft-rules.md](references/draft-rules.md) — grounding rules, section rules, voice profile.
+3. Key rule: **every item must trace to raw data from Step 2. Never fabricate.**
 
-### Step 5: Draft the report
+### Step 4: Approval gate
 
-Follow [references/draft-rules.md](references/draft-rules.md). Key rule: **every item must trace to raw data. Never fabricate.**
-
-### Step 6: Approval gate
-
-Read [assets/approval-gate-template.md](assets/approval-gate-template.md), substitute `{W_start}`, `{W_end}`, `{GMAIL_USER}`, `{REPORT_RECIPIENTS}`, `{DRAFT}` with real values, and print in chat.
-
-### Step 7: Handle choice
+Read [assets/approval-gate-template.md](assets/approval-gate-template.md), substitute variables with real values, print in chat, and **WAIT** for user choice.
 
 | Input | Action |
 |---|---|
-| `1` / `送出` / `send` / `yes` | → Step 8 |
-| `2 <instruction>` / `修改 <instruction>` | edit → reprint Step 6 |
-| bare `2` / bare `修改` | ask what to change → apply → reprint |
-| `3` / `重新生成` | re-draft (no re-fetch) → reprint |
+| `1` / `送出` / `send` / `yes` | → Step 5 |
+| `2 <instruction>` / `修改` | apply edit → reprint approval gate |
+| `3` / `重新生成` | re-draft from same data (no re-fetch) → reprint |
 | `4` / `取消` / `cancel` | `❌ Cancelled.` → STOP |
-| `dry run` | print draft, return to Step 6 |
+| `dry run` | print what would be sent, return to approval gate |
 | anything else | ask to clarify |
 
-**CRITICAL:** never auto-select option 1.
+**CRITICAL:** never auto-select option 1. When in doubt, ask.
 
-### Step 8: Send
-
-- **8a: Email** — follow [references/send-email.md](references/send-email.md) (IMAP/SMTP via email-client.py)
-- **8b: LINE** — follow [references/send-line.md](references/send-line.md) (LINE Bot MCP broadcast)
-- **8c: LinkedIn** — follow [references/send-linkedin.md](references/send-linkedin.md) (LinkedIn MCP DM)
+### Step 5: Send to ALL configured channels
 
 Each channel is independent — if one fails, continue to the next.
 
-### Step 9: Summary
+| Channel | Reference | Method |
+|---|---|---|
+| Email | [references/send-email.md](references/send-email.md) | IMAP/SMTP via `scripts/email-client.py` |
+| LINE | [references/send-line.md](references/send-line.md) | LINE Bot MCP broadcast |
+| LinkedIn | [references/send-linkedin.md](references/send-linkedin.md) | Playwright → LinkedIn web |
+
+### Step 6: Delivery summary
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Delivery Summary
-  Email:    ✅ / ❌
+  Email:    ✅ / ❌ / ⚠️ not configured
   LINE:     ✅ / ❌ / ⚠️ not configured
   LinkedIn: ✅ / ❌ / ⚠️ not configured
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
+---
+
+## Q&A Mode
+
+One-shot check for inbound questions and reply. Run separately from the report pipeline.
+
+### Step 1: Load report context
+
+If raw data from the last report is still in working memory, use it. Otherwise, re-fetch from all sources (same window as last report).
+
+### Step 2: Check Email
+
+Follow [references/inbound-qa-email.md](references/inbound-qa-email.md). Read unread replies via IMAP, compose grounded answers, send replies via SMTP.
+
+### Step 3: Check LINE
+
+Follow [references/inbound-qa-line.md](references/inbound-qa-line.md). Read messages from webhook inbox (`/tmp/line-inbox.json`), compose grounded answers, reply via LINE Bot MCP push.
+
+### Step 4: Q&A summary
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📬 Q&A Summary
+  Email: {N} questions answered
+  LINE:  {N} questions answered
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
 ## Hard rules
 
-1. Never send without explicit approval at Step 6.
-2. Never reference items not in Step 3 raw output.
-3. Never skip `gh auth` check.
-4. Never re-fetch during regenerate (option 3).
-5. Never guess when input is ambiguous — ask.
-6. Never hardcode config — always read from `.env`.
+1. **Never send without explicit approval** at the approval gate.
+2. **Never fabricate** — every item must trace to raw data.
+3. **Never skip init** — all services must be ✅ before pipeline starts.
+4. **Never re-fetch during regenerate** (option 3) — use cached raw data.
+5. **Never guess** when input is ambiguous — ask.
+6. **Never hardcode config** — always read from `.env`.
+7. **Reply in the user's voice** — follow [references/voice-profile.md](references/voice-profile.md) for QA responses.
