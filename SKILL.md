@@ -14,31 +14,11 @@ Two modes:
 
 ### Step 0: Init & health check
 
-Check each service in order. **If ANY is ❌, fix it immediately before moving to the next.** Do NOT proceed to Step 1 until ALL are ✅.
+Check each service. If ❌, follow its init reference to fix. Do NOT proceed until ALL ✅.
 
-| # | Service | Check | If ❌, follow | Auto or user? |
-|---|---|---|---|---|
-| 1 | GitHub | `gh auth status` | [init-github.md](references/init-github.md) | User clicks auth in browser |
-| 2 | Email | SMTP send test via `scripts/email-client.py` | [init-email.md](references/init-email.md) | User logs in + 2FA; skill creates App Password |
-| 3 | Slack | Slack MCP tools available? | [init-slack.md](references/init-slack.md) | User runs `/mcp` connect |
-| 4 | Notion | Notion MCP tools available? | [init-notion.md](references/init-notion.md) | User runs `/mcp` connect |
-| 5 | LINE | LINE Bot MCP tools available + webhook active? | [init-line.md](references/init-line.md) | User logs in LINE; skill does the rest |
-| 6 | LinkedIn | LinkedIn MCP tools available + session valid? | [init-linkedin.md](references/init-linkedin.md) | User logs in LinkedIn once |
+Init references: [init-github.md](references/init-github.md) · [init-email.md](references/init-email.md) · [init-slack.md](references/init-slack.md) · [init-notion.md](references/init-notion.md) · [init-line.md](references/init-line.md) · [init-linkedin.md](references/init-linkedin.md)
 
-Print health check result:
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 Service health check
-  GitHub:   ✅ / ❌
-  Email:    ✅ / ❌
-  Slack:    ✅ / ❌
-  Notion:   ✅ / ❌
-  LINE:     ✅ / ❌
-  LinkedIn: ✅ / ❌
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-**Rules:** Login pages = hands off. Post-login = skill drives. Auto-install MCPs when possible. Only ask user when physically required (password, SMS, `/mcp` connect).
+Print result using [assets/health-check-template.md](assets/health-check-template.md).
 
 ### Step 1: Compute the window
 
