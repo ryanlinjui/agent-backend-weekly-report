@@ -26,7 +26,7 @@
 
 ## Install LINE Bot MCP
 
-11. Add `line-bot` entry to `.mcp.json` in working tree:
+11. Add `line-bot` entry to project root `.mcp.json`:
     ```json
     "line-bot": {
       "type": "stdio",
