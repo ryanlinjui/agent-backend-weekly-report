@@ -11,17 +11,17 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 **All state lives in this skill's folder** (`skills/weekly-report/`): `config.json`, `.browser-session/`, and LINE Bot MCP config in project `.mcp.json`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
 
-**First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init). Then scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
+**Playwright, Slack, Notion are ALL pre-configured in `.mcp.json`. NEVER check if they're installed. NEVER try to install them. NEVER call any MCP tool until Step 1. Just trust they exist and use them when needed.**
 
-### Phase 1: Check GitHub (no browser, no MCP)
+First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init).
 
-Do NOT check or call any MCP tools yet — checking MCP too early may cause the agent to wrongly cache them as unavailable.
+### Phase 1: Check GitHub ONLY
+
+**ONLY run `gh auth status`. Do NOT call ANY MCP tool (Playwright, Slack, Notion, or anything else). MCP tools are pre-installed — calling them too early causes false "unavailable" errors.**
 
 | Service | How to check | If not ready |
 |---|---|---|
 | GitHub | `gh auth status` | `gh auth login --web` |
-
-Slack and Notion are checked later in Step 1 (Fetch) when MCP is fully ready.
 
 ### Phase 2: Ask recipients
 
