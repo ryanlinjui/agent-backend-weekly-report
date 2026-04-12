@@ -14,11 +14,17 @@ Two modes:
 
 ### Step 0: Init & health check
 
-Check each service. If ❌, follow its init reference to fix. Do NOT proceed until ALL ✅.
+Read `.env` — if missing or incomplete, create it by running each service's init. The pipeline depends on these keys being valid:
 
-Init references: [init-github.md](references/init-github.md) · [init-email.md](references/init-email.md) · [init-slack.md](references/init-slack.md) · [init-notion.md](references/init-notion.md) · [init-line.md](references/init-line.md) · [init-linkedin.md](references/init-linkedin.md)
+```
+GITHUB_USERNAME, EMAIL_USER, EMAIL_PASSWORD,
+LINE_CHANNEL_ACCESS_TOKEN, LINKEDIN_RECIPIENTS, REPORT_RECIPIENTS, REPORT_WINDOW_DAYS
+```
 
-Print result using [assets/health-check-template.md](assets/health-check-template.md).
+For each missing/invalid key, follow its init reference to obtain it:
+[init-github.md](references/init-github.md) · [init-email.md](references/init-email.md) · [init-slack.md](references/init-slack.md) · [init-notion.md](references/init-notion.md) · [init-line.md](references/init-line.md) · [init-linkedin.md](references/init-linkedin.md)
+
+Also verify MCP connections (Slack, Notion, LINE Bot, LinkedIn) are live. Print result using [assets/health-check-template.md](assets/health-check-template.md). Do NOT proceed until ALL ✅.
 
 ### Step 1: Compute the window
 
