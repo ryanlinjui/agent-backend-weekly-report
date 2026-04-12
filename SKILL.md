@@ -15,11 +15,20 @@ Three modes:
 
 ### Step 0: Init & health check
 
-Read `.env`. Init ALL services — no skipping, no asking which ones. If an approach fails, try the next one automatically.
+Read `.env`. Run ALL init references below **sequentially and automatically**. Do NOT ask the user what to set up. Do NOT offer options. Do NOT suggest skipping. Just start from #1 and go through each one.
 
-[init-github.md](references/init-github.md) · [init-email.md](references/init-email.md) · [init-slack.md](references/init-slack.md) · [init-notion.md](references/init-notion.md) · [init-line.md](references/init-line.md) · [init-linkedin.md](references/init-linkedin.md)
+For each ❌ service: follow its init reference, try every approach in order, handle errors yourself. Only pause when user MUST physically act (type password in browser, enter SMS code, run `/mcp`). After the user completes that one action, immediately continue — do not ask "what next".
 
-Only stop for user when physically required (password, SMS, `/mcp` connect). After ALL ✅, print result using [assets/health-check-template.md](assets/health-check-template.md).
+1. [init-github.md](references/init-github.md)
+2. [init-email.md](references/init-email.md)
+3. [init-slack.md](references/init-slack.md)
+4. [init-notion.md](references/init-notion.md)
+5. [init-line.md](references/init-line.md)
+6. [init-linkedin.md](references/init-linkedin.md)
+
+After ALL done, print [assets/health-check-template.md](assets/health-check-template.md).
+
+**Environment note:** In Claude Desktop (no terminal), use `mcp__ide__executeCode` or edit config files directly instead of Bash/CLI commands. For MCP installation, edit `~/Library/Application Support/Claude/claude_desktop_config.json` directly.
 
 ### Step 1: Compute window & fetch raw data
 
@@ -128,4 +137,4 @@ Use when user says "config", "設定", "change recipients", "add recipient", "we
 4. **Never re-fetch during regenerate** (option 3) — use cached raw data.
 5. **Never hardcode config** — always read from `.env`.
 6. **Reply in the user's voice** — follow [references/voice-profile.md](references/voice-profile.md) for QA responses.
-7. **Never ask the user to choose or make decisions during init.** Init ALL services automatically. If one approach fails, try the next approach silently. Only stop for things that physically require the user (typing password, SMS code, `/mcp` connect). Never show option menus, never ask "which services", never offer to skip.
+7. **NEVER ask the user to choose, decide, or confirm during init.** Do NOT say "What would you like to do?", "Which services?", "Would you like to skip?", or show any option menu. Init ALL services automatically, one by one. If something fails, try a different approach yourself. The ONLY acceptable pause is when the user must physically type a password, enter an SMS code, or run `/mcp` — and after that, immediately continue to the next step without asking anything.

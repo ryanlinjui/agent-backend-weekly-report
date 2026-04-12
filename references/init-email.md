@@ -1,6 +1,7 @@
 # Init: Email (IMAP/SMTP)
 
-> **Rule:** Do NOT ask the user to choose approaches or skip services. Try each approach automatically. If one fails, try the next. Only stop for physical user interaction (login, password, SMS, /mcp connect).
+> **Rule:** NEVER ask the user to choose or make decisions. Try every approach automatically. If one fails, silently try the next. Only pause when user must physically act (password, SMS, /mcp). After they act, immediately continue.
+> **Claude Desktop:** No terminal available. Use tool calls and file edits instead of Bash/CLI. For MCP install, edit `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
 ## Check
 
