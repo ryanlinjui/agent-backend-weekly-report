@@ -18,10 +18,10 @@
    - Disable **Auto-reply**
    - Disable **Greeting message**
 
-## Get Channel Access Token
+## Get Channel Access Token (headless — if login required, visible then close)
 
-8. Navigate to `https://developers.line.biz` → select the channel linked to the OA
-9. Messaging API tab → Issue / copy the long-lived Channel Access Token
+8. Using `playwright-headless`, navigate to `https://developers.line.biz`. If a login page appears: **close headless**, use `playwright-login` for user to log in, then **close visible browser** and switch back to `playwright-headless`.
+9. Select the channel linked to the OA → Messaging API tab → Issue / copy the long-lived Channel Access Token
 10. Save to `config.json` as `line_channel_access_token`
 
 ## Install LINE Bot MCP
