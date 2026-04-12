@@ -1,11 +1,11 @@
 # Init: LINE
 
-**Use Playwright MCP only.** Do NOT use "Claude in Chrome", `open` bash, or any other browser tool. Do NOT search for tools — just call Playwright directly.
+**Use Playwright MCP only.** Tools are in the deferred tools list — just call them directly. Do NOT use "Claude in Chrome", `open` bash, or search MCP registry.
 
 If LINE Bot MCP tools not available or `LINE_CHANNEL_ACCESS_TOKEN` empty:
 
-1. Call Playwright `browser_navigate` to open LINE Developers Console (visible browser — user logs in)
-2. After login, switch to headless. Create LINE Official Account if none exists
+1. Call `playwright-login` `browser_navigate` to open LINE Developers Console (visible browser — user logs in)
+2. After login, use `playwright-headless` for all remaining steps. Create LINE Official Account if none exists
 3. Enable Messaging API
 4. Issue Channel Access Token → save to `.env`
 5. Install LINE Bot MCP: `claude mcp add-json line-bot '{"type":"stdio","command":"npx","args":["-y","@line/line-bot-mcp-server"],"env":{"CHANNEL_ACCESS_TOKEN":"<token>"}}'`

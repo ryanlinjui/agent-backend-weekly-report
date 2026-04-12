@@ -22,7 +22,7 @@ Read `.env`. If missing or keys empty, create it. For each service, just call it
 
 **After ALL ✅, ask user: "報告要寄給誰？"** Save recipients to `.env`.
 
-Browser automation: **only use Playwright MCP** — call `browser_navigate` directly. Do NOT use "Claude in Chrome", `open` bash, or search tools. Visible browser for login only, headless for everything else.
+Browser automation: **only use Playwright MCP.** Tools are in the deferred tools list — just call them directly, no searching needed. Use `playwright-login` (visible) for login pages, `playwright-headless` (invisible) for post-login automation. Do NOT use "Claude in Chrome", `open` bash, or any other browser method.
 
 ## Step 1: Fetch
 
