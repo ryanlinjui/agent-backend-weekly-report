@@ -1,119 +1,67 @@
 # Init: Email (IMAP/SMTP)
 
 > **Rule:** NEVER ask the user to choose or make decisions. Try every approach automatically. If one fails, silently try the next. Only pause when user must physically act (password, SMS, /mcp). After they act, immediately continue.
-> **Claude Desktop:** No terminal available. Use tool calls and file edits instead of Bash/CLI. For MCP install, edit `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
 ## Check
 
-```bash
-source .env
-python3 scripts/email-client.py send \
-  --to "$EMAIL_USER" --subject "init test" \
-  --body-file <(echo "test")
-```
+Test SMTP with `scripts/email-client.py`. If OK → ✅. If auth error → needs App Password. If `EMAIL_USER` empty → ask user for email address (the ONLY question allowed).
 
-- If returns `OK` → ✅ already initialized.
-- If auth error → ❌ needs App Password.
-- If `EMAIL_USER` empty → ❌ needs full init.
+## Browser tool fallback chain
+
+For ALL browser operations in this init, try tools in this order. **Do NOT stop if the first tool fails — silently try the next:**
+
+1. **Chrome DevTools MCP** (`navigate_page`, `click`, `fill`, `take_snapshot`)
+2. **Playwright login** (`playwright-login` — headed, visible browser)
+3. **Playwright headless** (`playwright-headless` — if no login needed)
+
+If ALL three fail → tell user which URL to open manually, but still try to automate everything else.
 
 ## Init steps
 
-### 1. Ask for email address (if not in .env)
+### 1. Get email address
 
-If `EMAIL_USER` is empty:
-```
-What email address should the report be sent from?
-```
-Wait for user to provide email. Save to `.env` as `EMAIL_USER`.
+If `EMAIL_USER` empty in `.env`, ask: `What email address should the report be sent from?`
+Save to `.env`. Detect provider from domain (check MX for Google Workspace: `dig MX {domain} +short | grep -q google`).
 
-### 2. Detect provider
+### 2. Open App Password page
 
-Auto-detect from email domain:
+Using the **browser fallback chain above**, navigate to the provider's App Password URL:
+- Google: `https://myaccount.google.com/apppasswords`
+- Outlook: `https://account.live.com/proofs/AppPassword`
+- Yahoo: `https://login.yahoo.com/myc/security`
+- iCloud: `https://appleid.apple.com/account/manage`
 
-| Domain | Provider | Login URL |
-|---|---|---|
-| gmail.com / Google Workspace | Google | `https://myaccount.google.com/apppasswords` |
-| outlook.com / hotmail.com | Microsoft | `https://account.live.com/proofs/AppPassword` |
-| yahoo.com | Yahoo | `https://login.yahoo.com/myc/security` |
-| icloud.com / me.com | Apple | `https://appleid.apple.com/account/manage` |
+If redirected to login: `🌐 Login page opened. Please log in, then say "ok".`
+**Wait for "ok".** Login page = hands off.
 
-For Google Workspace domains, check MX record:
-```bash
-dig MX {domain} +short | grep -q google
-```
+### 3. Enable 2FA if needed (Google)
 
-### 3. Open App Password page via Playwright
+After login, take snapshot to check page. If 2FA is off:
+- Navigate to `https://myaccount.google.com/signinoptions/two-step-verification`
+- Skill clicks "Turn on" / navigates to phone setup
+- Phone number input → `📱 Enter phone number and verify, then say "ok".` → wait
+- After verify → skill clicks "Turn on 2-Step Verification"
 
-Use `playwright-login` (headed — visible browser):
+### 4. Create App Password (fully automated)
 
-```
-Playwright: browser_navigate → {provider App Password URL}
-```
+Navigate to App Password page → snapshot → fill "weekly-report" → click Create → snapshot → **read the 16-character password from the page**.
 
-If redirected to login page:
-```
-🌐 Login page opened. Please log in and complete any verification, then say "ok".
-```
-**Wait for "ok".** Login page = hands off. Do NOT fill any fields.
+No user interaction. Skill reads the password directly.
 
-### 4. Enable 2FA if needed (Google only)
+### 5. Save + verify
 
-After login, `browser_snapshot` to check page.
+Save to `.env` as `EMAIL_PASSWORD`. Test SMTP. If fail → retry from step 4.
 
-If on "2FA not enabled" page:
-```
-Playwright: browser_navigate → https://myaccount.google.com/signinoptions/two-step-verification
-Playwright: browser_snapshot → check if 2FA is ON
-```
+### 6. Confirm recipients
 
-- If OFF → skill clicks "Turn on" → navigates to phone setup
-- Phone number input → **STOP**: `📱 Enter phone number and verify, then say "ok".` → wait
-- After verify → skill clicks "Turn on 2-Step Verification" → confirm ON
+If `REPORT_RECIPIENTS` empty: ask user for email addresses. Save to `.env`. Verify format. Do NOT send actual email during init.
 
-### 5. Create App Password (fully automated)
-
-```
-Playwright: browser_navigate → {App Password URL}
-Playwright: browser_snapshot → find input field
-Playwright: browser_type → "weekly-report" in App name field
-Playwright: browser_click → Create button
-Playwright: browser_snapshot → read the generated password from page
-```
-
-**No user interaction.** Skill reads the password directly.
-
-### 6. Save + verify
-
-Save to `.env` as `EMAIL_PASSWORD`.
-
-```bash
-python3 scripts/email-client.py send \
-  --to "$EMAIL_USER" --subject "Weekly Report — email configured" \
-  --body-file <(echo "If you see this, email is working.")
-```
-
-If OK → proceed to step 7.
-If fail → retry from step 5.
-
-### 7. Confirm recipients
-
-If `REPORT_RECIPIENTS` is empty in `.env`:
-```
-Who should receive the weekly report by email? (comma-separated addresses)
-```
-Save to `.env` as `REPORT_RECIPIENTS`.
-
-### 8. Verify recipients are valid
-
-For each address in `REPORT_RECIPIENTS`, verify the format is valid (contains `@`, has domain). Do NOT send any actual email during init.
-
-SMTP auth was already verified in step 6 — if that passed, sending will work.
-
-Print: `✅ Email configured. Recipients: {REPORT_RECIPIENTS}`
+Print: `✅ Email configured.`
 
 ## User interaction
 
-- Login page: user types password + 2FA (once)
-- Phone verification: user enters phone number (once, if 2FA not enabled)
-- Provide recipient email addresses (once)
-- Everything else: skill auto-drives
+- Email address (once, if not in .env)
+- Login (once, password + 2FA)
+- Phone verification (once, if 2FA not enabled)
+- Recipient addresses (once)
+- Everything else: skill auto-drives using browser fallback chain

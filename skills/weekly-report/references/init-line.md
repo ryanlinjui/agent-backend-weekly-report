@@ -5,6 +5,13 @@ LINE requires two things: LINE Bot MCP (for sending) and webhook (for receiving 
 > **Rule:** NEVER ask the user to choose or make decisions. Try every approach automatically. If one fails, silently try the next. Only pause when user must physically act (password, SMS, /mcp). After they act, immediately continue.
 > **Claude Desktop:** No terminal available. Use tool calls and file edits instead of Bash/CLI. For MCP install, edit `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
+## Browser tool fallback chain
+
+For ALL browser operations, try in order (do NOT stop if one fails):
+1. **Chrome DevTools MCP** (navigate_page, click, fill, take_snapshot)
+2. **Playwright login** (playwright-login — headed, visible)
+3. **Playwright headless** (playwright-headless — invisible)
+If ALL fail → tell user the URL, but keep trying to automate.
 ## Check
 
 ### LINE Bot MCP
