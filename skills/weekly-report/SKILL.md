@@ -13,13 +13,15 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 **First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init). Then scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
 
-### Phase 1: Check services (no browser)
+### Phase 1: Check GitHub (no browser, no MCP)
+
+Do NOT check or call any MCP tools yet — checking MCP too early may cause the agent to wrongly cache them as unavailable.
 
 | Service | How to check | If not ready |
 |---|---|---|
 | GitHub | `gh auth status` | `gh auth login --web` |
-| Slack | Call any Slack MCP tool | System handles OAuth automatically |
-| Notion | Call any Notion MCP tool | System handles OAuth automatically |
+
+Slack and Notion are checked later in Step 1 (Fetch) when MCP is fully ready.
 
 ### Phase 2: Ask recipients
 
