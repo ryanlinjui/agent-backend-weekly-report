@@ -82,6 +82,10 @@ Print delivery summary (✅ / ❌ / ⚠️ per channel).
 4. Never re-fetch during regenerate.
 5. Never hardcode config — read from `.env`.
 6. Never ask user to choose during init — auto-do everything, only pause for physical interaction (password, SMS, `/mcp`).
-7. **Browser fallback chain** — use `ToolSearch` (search `navigate`) to find browser tools. Only use tools containing `chrome-devtools` or `playwright` in their name. Try in order: Chrome DevTools → Playwright login → Playwright headless. **NEVER use "Claude in Chrome" tools, `open` bash command, or any other browser method.** NEVER stop after one fails — try ALL before manual instructions.
+7. **Browser fallback chain** — plugin tools are DEFERRED and must be loaded first:
+   a. Call `ToolSearch("chrome-devtools navigate")` to load Chrome DevTools tools
+   b. Call `ToolSearch("playwright navigate")` to load Playwright tools
+   c. Try Chrome DevTools `navigate_page` → if error → try Playwright `browser_navigate`
+   **Only use tools containing `chrome-devtools` or `playwright`. NEVER use "Claude in Chrome", `open` bash, or anything else.** NEVER stop after one fails — try ALL.
 8. **Headless by default** — only show a visible browser window when the user MUST physically type (login password, SMS code). All other browser operations MUST use headless/invisible browser.
 9. **NEVER use AskUserQuestion during init.** Do NOT show option menus, radio buttons, or skip buttons. Print plain text messages only. If user must act (login, /mcp), print a simple message and wait for their next message — do NOT create interactive UI elements.

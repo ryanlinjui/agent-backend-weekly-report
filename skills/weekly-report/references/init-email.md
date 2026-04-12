@@ -12,7 +12,9 @@ When you need to open a URL, you MUST try ALL available browser tools before giv
 
 ### How to find and try browser tools
 
-1. Use `ToolSearch` to find available browser tools: search for `navigate`
+1. **LOAD tools first** (they are deferred in Claude Desktop — must be fetched before calling):
+   - Call `ToolSearch("chrome-devtools navigate")` → loads Chrome DevTools tools
+   - Call `ToolSearch("playwright navigate")` → loads Playwright tools
 2. **ONLY use tools whose name contains `chrome-devtools` or `playwright`.** Ignore everything else.
 3. Try in this order:
    - **Chrome DevTools** tools (name contains `chrome-devtools` + `navigate_page`)
