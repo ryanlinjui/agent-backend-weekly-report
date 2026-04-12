@@ -38,11 +38,7 @@ Print health check result:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-**Rules:**
-- Login pages = hands off (user types). Post-login = skill drives.
-- Auto-install MCPs when possible (`claude mcp add-json`).
-- Only ask user when physically required (password, SMS, `/mcp` connect).
-- Loop: check → fix → re-check until ALL ✅.
+**Rules:** Login pages = hands off. Post-login = skill drives. Auto-install MCPs when possible. Only ask user when physically required (password, SMS, `/mcp` connect).
 
 ### Step 1: Compute the window
 
