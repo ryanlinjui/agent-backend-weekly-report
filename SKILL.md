@@ -15,17 +15,11 @@ Three modes:
 
 ### Step 0: Init & health check
 
-Read `.env`. For each missing/invalid key, follow its init reference:
+Read `.env`. Init ALL services — no skipping, no asking which ones. If an approach fails, try the next one automatically.
+
 [init-github.md](references/init-github.md) · [init-email.md](references/init-email.md) · [init-slack.md](references/init-slack.md) · [init-notion.md](references/init-notion.md) · [init-line.md](references/init-line.md) · [init-linkedin.md](references/init-linkedin.md)
 
-After all services are ✅, confirm recipients with the user:
-1. Read `REPORT_RECIPIENTS` (email), `LINKEDIN_RECIPIENTS` from `.env`
-2. Print current recipients and ask: **「報告會寄給以下收件人，確認嗎？」**
-3. If user wants to add/change → update `.env`
-4. Verify recipients are reachable (format check, connection check) — **do NOT send actual messages during init**
-5. If any issue → explain to user → ask to fix or skip
-
-Print result using [assets/health-check-template.md](assets/health-check-template.md). Do NOT proceed until ALL ✅ + recipients confirmed.
+Only stop for user when physically required (password, SMS, `/mcp` connect). After ALL ✅, print result using [assets/health-check-template.md](assets/health-check-template.md).
 
 ### Step 1: Compute window & fetch raw data
 
@@ -132,6 +126,6 @@ Use when user says "config", "設定", "change recipients", "add recipient", "we
 2. **Never fabricate** — every item must trace to raw data.
 3. **Never skip init** — all services must be ✅ before pipeline starts.
 4. **Never re-fetch during regenerate** (option 3) — use cached raw data.
-5. **Never guess** when input is ambiguous — ask.
-6. **Never hardcode config** — always read from `.env`.
-7. **Reply in the user's voice** — follow [references/voice-profile.md](references/voice-profile.md) for QA responses.
+5. **Never hardcode config** — always read from `.env`.
+6. **Reply in the user's voice** — follow [references/voice-profile.md](references/voice-profile.md) for QA responses.
+7. **Never ask the user to choose or make decisions during init.** Init ALL services automatically. If one approach fails, try the next approach silently. Only stop for things that physically require the user (typing password, SMS code, `/mcp` connect). Never show option menus, never ask "which services", never offer to skip.

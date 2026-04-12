@@ -2,6 +2,8 @@
 
 LINE requires two things: LINE Bot MCP (for sending) and webhook (for receiving QA questions).
 
+> **Rule:** Do NOT ask the user to choose approaches or skip services. Try each approach automatically. If one fails, try the next. Only stop for physical user interaction (login, password, SMS, /mcp connect).
+
 ## Check
 
 ### LINE Bot MCP

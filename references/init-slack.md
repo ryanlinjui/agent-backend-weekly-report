@@ -1,5 +1,7 @@
 # Init: Slack
 
+> **Rule:** Do NOT ask the user to choose approaches or skip services. Try each approach automatically. If one fails, try the next. Only stop for physical user interaction (login, password, SMS, /mcp connect).
+
 ## Check
 
 Are `mcp__plugin_slack_slack__*` tools available?
