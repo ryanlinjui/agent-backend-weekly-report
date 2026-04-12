@@ -63,13 +63,13 @@ Show draft + recipients. User picks: `1` send / `2` edit / `3` regenerate / `4` 
 
 ## Step 4: Send
 
-Each channel independent — if one fails, try Chrome DevTools MCP as fallback, then continue others.
+Each channel independent — if one fails, try Chrome DevTools MCP as fallback, then continue others. **After each successful send, take a screenshot as proof and show it to the user.**
 
 | Channel | How |
 |---|---|
-| Email | Playwright headless → Gmail: Compose → fill To / Subject / Body → Send |
-| LINE | LINE Bot MCP `broadcast_text_message` (API, no browser needed) |
-| LinkedIn | Playwright headless → LinkedIn: open recipient profile → Message → send DM |
+| Email | Playwright headless → Gmail: Compose → fill To / Subject / Body → Send → screenshot sent confirmation |
+| LINE | LINE Bot MCP `broadcast_text_message` → then Playwright headless open LINE OA Manager chat to screenshot the sent message |
+| LinkedIn | Playwright headless → LinkedIn: open recipient profile → Message → send DM → screenshot sent confirmation |
 
 ## Rules
 
