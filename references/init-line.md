@@ -134,13 +134,15 @@ Must return `{"success": true}`.
 
 Navigate to LINE OA Manager → Response settings → turn OFF "Auto-response messages" toggle (prevents the default "本帳號無法個別回覆" message).
 
-#### 8. E2E verify — send test broadcast
+#### 8. Verify API access (no actual send)
 
 ```
-LINE Bot MCP: broadcast_text_message → "LINE init test — if you see this, LINE is working."
+LINE Bot MCP: get_message_quota
 ```
 
-Must succeed (`{}` response). If followers receive the message → ✅ LINE fully working.
+Must return quota data. If OK → `✅ LINE configured. Broadcast will reach all followers.`
+
+**Do NOT send any actual message during init.**
 
 ## User interaction
 

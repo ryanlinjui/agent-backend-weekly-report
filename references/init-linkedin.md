@@ -52,15 +52,16 @@ LinkedIn MCP: get_inbox
 ```
 Must return inbox data (not a login error).
 
-### 5. Test send to each recipient
+### 5. Verify recipients are reachable (no actual send)
 
 For each recipient in `LINKEDIN_RECIPIENTS`:
-1. `LinkedIn MCP: get_person_profile` → confirm they're a 1st connection (shows "Message" button)
-2. Send test via Playwright → LinkedIn compose → type "Weekly Report delivery test" → Send
-3. If sent → `✅ LinkedIn DM works for {recipient}.`
-4. If fails (not connected, composer unavailable) → explain to user: e.g., `⚠️ Cannot DM {recipient} — not a 1st connection. Send a connection request first?`
-   - If user says yes → `LinkedIn MCP: connect_with_person` → retry after connected
+1. `LinkedIn MCP: get_person_profile` → check if they're a 1st connection
+2. If 1st connection (shows "Message") → `✅ {recipient} is reachable.`
+3. If NOT connected → inform user: `⚠️ {recipient} is not a 1st connection — DM may not work. Send a connection request?`
+   - If user says yes → `LinkedIn MCP: connect_with_person`
    - If user says skip → remove from `LINKEDIN_RECIPIENTS` in `.env`
+
+**Do NOT send any actual message during init.**
 
 ## User interaction
 

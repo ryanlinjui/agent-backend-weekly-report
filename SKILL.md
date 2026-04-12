@@ -21,8 +21,9 @@ Read `.env`. For each missing/invalid key, follow its init reference:
 After all services are ✅, confirm recipients with the user:
 1. Read `REPORT_RECIPIENTS` (email), `LINKEDIN_RECIPIENTS` from `.env`
 2. Print current recipients and ask: **「報告會寄給以下收件人，確認嗎？」**
-3. If user wants to add/change → update `.env` → test send to new recipient → confirm delivery
-4. If any test send fails → explain the issue to user (e.g., "LinkedIn DM failed — not a 1st connection") → ask user how to proceed
+3. If user wants to add/change → update `.env`
+4. Verify recipients are reachable (format check, connection check) — **do NOT send actual messages during init**
+5. If any issue → explain to user → ask to fix or skip
 
 Print result using [assets/health-check-template.md](assets/health-check-template.md). Do NOT proceed until ALL ✅ + recipients confirmed.
 

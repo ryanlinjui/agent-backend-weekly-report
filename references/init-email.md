@@ -100,17 +100,13 @@ Who should receive the weekly report by email? (comma-separated addresses)
 ```
 Save to `.env` as `REPORT_RECIPIENTS`.
 
-### 8. Test send to recipients
+### 8. Verify recipients are valid
 
-Send a test email to each recipient in `REPORT_RECIPIENTS`:
-```bash
-python3 scripts/email-client.py send \
-  --to "{RECIPIENT}" --subject "Weekly Report — test delivery" \
-  --body-file <(echo "This is a test. If you see this, email delivery is configured.")
-```
+For each address in `REPORT_RECIPIENTS`, verify the format is valid (contains `@`, has domain). Do NOT send any actual email during init.
 
-If OK → `✅ Email configured. Test sent to {RECIPIENT}.`
-If fail → explain the error to user (e.g., "invalid address", "SMTP rejected") → ask to fix or skip this recipient.
+SMTP auth was already verified in step 6 — if that passed, sending will work.
+
+Print: `✅ Email configured. Recipients: {REPORT_RECIPIENTS}`
 
 ## User interaction
 
