@@ -6,7 +6,16 @@ compatibility: Requires gh CLI. MCP servers auto-installed during init (Slack, N
 
 # Weekly Report Skill
 
-Three modes:
+## Language detection
+
+Auto-detect the user's language. Do NOT ask. Use this priority:
+1. **User's message language** — if `/weekly-report` is preceded or followed by any text, use that language
+2. **OS locale** — run `defaults read NSGlobalDomain AppleLocale 2>/dev/null || echo $LANG` to detect (e.g., `zh_TW` → 繁體中文, `en_US` → English, `ja_JP` → 日本語)
+3. **Slack message language** — after fetching Slack data in Step 1, detect the dominant language from the user's messages
+
+Use the detected language for ALL output: health check, approval gate, summary, QA replies, error messages.
+
+## Three modes:
 - **Weekly report** — generate + approve + send
 - **Q&A** — check for inbound questions and reply in the producer's voice
 - **Config** — add/change recipients, re-init services, update `.env`
