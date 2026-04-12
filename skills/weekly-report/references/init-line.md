@@ -13,7 +13,10 @@
 4. Switch to `playwright-headless` for all remaining steps
 5. Always create a **new** LINE Official Account for weekly report (ignore existing ones, auto-agree to all terms/conditions)
 6. Enable Messaging API via Settings (auto-agree to any terms)
-7. Disable **Auto-reply** and **Greeting message** in Settings → Response settings
+7. In Settings → Response settings:
+   - Enable **Chat** (toggle ON — required for QA to read/reply messages via web)
+   - Disable **Auto-reply**
+   - Disable **Greeting message**
 
 ## Get Channel Access Token
 
