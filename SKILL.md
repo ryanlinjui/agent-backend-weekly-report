@@ -78,10 +78,6 @@ Each channel is independent — if one fails, continue to the next.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-### Step 10: Start Q&A auto-polling
-
-Follow [references/qa-polling.md](references/qa-polling.md). Creates a session-only cron job to check for inbound replies.
-
 ## Hard rules
 
 1. Never send without explicit approval at Step 6.
