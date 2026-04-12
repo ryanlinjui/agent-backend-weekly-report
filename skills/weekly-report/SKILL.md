@@ -78,3 +78,4 @@ Each channel independent — if one fails, try Chrome DevTools MCP as fallback, 
 3. Never ask user to choose during init — just do it. **NEVER use AskUserQuestion.** Plain text only.
 4. ALL init must complete before ANY fetch.
 5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools.
+6. **Always call `browser_close` when done.** Playwright only allows one session at a time — if not closed, other skills cannot use the browser.
