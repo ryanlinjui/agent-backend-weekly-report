@@ -26,16 +26,11 @@ For each missing/invalid key, follow its init reference to obtain it:
 
 Also verify MCP connections (Slack, Notion, LINE Bot, LinkedIn) are live. Print result using [assets/health-check-template.md](assets/health-check-template.md). Do NOT proceed until ALL ✅.
 
-### Step 1: Compute the window
+### Step 1: Compute window & fetch raw data
 
-Read `.env` for `REPORT_WINDOW_DAYS` (default: 7).
+Compute window: `W_start` = now − `REPORT_WINDOW_DAYS` days, `W_end` = now (both `YYYY-MM-DD`).
 
-- `W_start` = now − `REPORT_WINDOW_DAYS` days, formatted `YYYY-MM-DD`
-- `W_end` = now, formatted `YYYY-MM-DD`
-
-### Step 2: Fetch raw data from ALL sources
-
-Fetch in order. Keep all raw output in working memory — do not summarize yet. If a source fails, warn and continue. STOP only if ALL sources fail.
+Fetch from all sources. Keep raw output in working memory — do not summarize yet. If a source fails, warn and continue. STOP only if ALL fail.
 
 | Source | Reference | Tool |
 |---|---|---|
@@ -43,19 +38,19 @@ Fetch in order. Keep all raw output in working memory — do not summarize yet. 
 | Slack | [references/fetch-slack.md](references/fetch-slack.md) | Slack MCP |
 | Notion | [references/fetch-notion.md](references/fetch-notion.md) | Notion MCP |
 
-### Step 3: Draft the report
+### Step 2: Draft the report
 
 1. Read [assets/report-template.md](assets/report-template.md) — follow its sections, order, and emojis exactly.
 2. Follow [references/draft-rules.md](references/draft-rules.md) — grounding rules, section rules, voice profile.
 3. Key rule: **every item must trace to raw data from Step 2. Never fabricate.**
 
-### Step 4: Approval gate
+### Step 3: Approval gate
 
 Read [assets/approval-gate-template.md](assets/approval-gate-template.md), substitute variables with real values, print in chat, and **WAIT** for user choice.
 
 | Input | Action |
 |---|---|
-| `1` / `送出` / `send` / `yes` | → Step 5 |
+| `1` / `送出` / `send` / `yes` | → Step 4 |
 | `2 <instruction>` / `修改` | apply edit → reprint approval gate |
 | `3` / `重新生成` | re-draft from same data (no re-fetch) → reprint |
 | `4` / `取消` / `cancel` | `❌ Cancelled.` → STOP |
@@ -64,7 +59,7 @@ Read [assets/approval-gate-template.md](assets/approval-gate-template.md), subst
 
 **CRITICAL:** never auto-select option 1. When in doubt, ask.
 
-### Step 5: Send to ALL configured channels
+### Step 4: Send to ALL configured channels
 
 Each channel is independent — if one fails, continue to the next.
 
@@ -74,7 +69,7 @@ Each channel is independent — if one fails, continue to the next.
 | LINE | [references/send-line.md](references/send-line.md) | LINE Bot MCP broadcast |
 | LinkedIn | [references/send-linkedin.md](references/send-linkedin.md) | Playwright → LinkedIn web |
 
-### Step 6: Delivery summary
+### Step 5: Delivery summary
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
