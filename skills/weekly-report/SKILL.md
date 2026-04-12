@@ -9,7 +9,7 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 ## Step 0: Init
 
-Read `.env`. If missing or keys empty, create it. For each service, use `ToolSearch` to find its tools, then call one to test. If auth needed, the system opens a browser — user logs in, skill continues.
+Read `.env`. If missing or keys empty, create it. For each service, just call its tool directly to test. If it works → ✅. If auth needed, the system opens a browser — user logs in, skill continues. If fails → follow its init reference.
 
 | Service | How to check | If ❌ |
 |---|---|---|
@@ -22,7 +22,7 @@ Read `.env`. If missing or keys empty, create it. For each service, use `ToolSea
 
 **After ALL ✅, ask user: "報告要寄給誰？"** Save recipients to `.env`.
 
-Browser automation: **only use Playwright** (search `ToolSearch("playwright")`). Only show visible browser for login pages. All other automation = headless.
+Browser automation: **only use Playwright MCP** — call `browser_navigate` directly. Do NOT use "Claude in Chrome", `open` bash, or search tools. Visible browser for login only, headless for everything else.
 
 ## Step 1: Fetch
 
