@@ -1,91 +1,47 @@
 ---
 name: weekly-report
-description: Generate and send a weekly report summarizing the producer's activity across GitHub, Slack, and Notion. Delivers via Email, LINE, and LinkedIn DM. Use when the user asks for "weekly report", "週報", "my week in review", or similar.
-compatibility: Requires gh CLI. MCP servers auto-installed via plugin .mcp.json (Slack, Notion, LINE Bot, LinkedIn, Playwright).
+description: Generate and send a weekly report from GitHub, Slack, and Notion. Delivers via Email, LINE, LinkedIn. Use when user says "weekly report", "週報", or similar.
 ---
 
 # Weekly Report
 
-## Language detection
+Auto-detect user language from OS locale or their message. Use that language for all output.
 
-Auto-detect the user's language. Do NOT ask. Priority:
-1. User's message language (if any text accompanies the command)
-2. OS locale (`defaults read NSGlobalDomain AppleLocale 2>/dev/null || echo $LANG`)
-3. Slack message language (after fetching in Step 1)
+## Step 0: Init
 
-Use detected language for ALL output.
+Read `.env`. If missing or keys empty, create it. For each service, use `ToolSearch` to find its tools, then call one to test. If auth needed, the system opens a browser — user logs in, skill continues.
 
-## Pipeline
-
-### Step 0: Init & health check
-
-Read `.env`. **Before marking any service as ❌, use `ToolSearch` to check if its tools already exist** — plugin MCPs from `.mcp.json` are auto-installed. Try calling the tool first; only mark ❌ if the call actually fails. For each failing service, follow its init reference — no asking, no options, no AskUserQuestion:
-
-1. [init-github.md](references/init-github.md)
-2. [init-email.md](references/init-email.md)
-3. [init-slack.md](references/init-slack.md)
-4. [init-notion.md](references/init-notion.md)
-5. [init-line.md](references/init-line.md)
-6. [init-linkedin.md](references/init-linkedin.md)
-
-Print [assets/health-check-template.md](assets/health-check-template.md). Do NOT proceed until ALL ✅.
-
-### Step 1: Fetch raw data
-
-Compute window: `W_start` = now − `REPORT_WINDOW_DAYS` days, `W_end` = now.
-
-| Source | Reference | Tool |
+| Service | How to check | If ❌ |
 |---|---|---|
-| GitHub | [references/fetch-github.md](references/fetch-github.md) | `gh` CLI |
-| Slack | [references/fetch-slack.md](references/fetch-slack.md) | Slack MCP |
-| Notion | [references/fetch-notion.md](references/fetch-notion.md) | Notion MCP |
+| GitHub | `gh auth status` | `gh auth login --web` |
+| Email | Test SMTP via `scripts/email-client.py` | Open App Password page with Playwright → user logs in → skill creates App Password automatically → save to `.env` |
+| Slack | Call any Slack MCP tool | System handles OAuth automatically |
+| Notion | Call any Notion MCP tool | System handles OAuth automatically |
+| LINE | Call LINE Bot MCP `get_message_quota` | See [references/init-line.md](references/init-line.md) |
+| LinkedIn | Call LinkedIn MCP `get_inbox` | MCP opens login browser automatically |
 
-Keep raw output in working memory. If a source fails, warn and continue.
+**After ALL ✅, ask user: "報告要寄給誰？"** Save recipients to `.env`.
 
-### Step 2: Draft
+Browser automation: **only use Playwright** (search `ToolSearch("playwright")`). Only show visible browser for login pages. All other automation = headless.
 
-Read [assets/report-template.md](assets/report-template.md). Follow [references/draft-rules.md](references/draft-rules.md). **Every item must trace to raw data. Never fabricate.**
+## Step 1: Fetch
 
-### Step 3: Approval gate
+Compute window (`REPORT_WINDOW_DAYS` days back). Fetch from GitHub (`gh` CLI), Slack (MCP), Notion (MCP). Keep raw data.
 
-Read [assets/approval-gate-template.md](assets/approval-gate-template.md), substitute variables, print, and **WAIT**.
+## Step 2: Draft
 
-| Input | Action |
-|---|---|
-| `1` / `送出` / `send` | → Step 4 |
-| `2` / `修改` | edit → reprint |
-| `3` / `重新生成` | re-draft (no re-fetch) → reprint |
-| `4` / `取消` / `cancel` | STOP |
-| `dry run` | print draft, return |
+Follow [references/report-template.md](references/report-template.md). Every item must trace to raw data. Never fabricate.
 
-**Never auto-select option 1.**
+## Step 3: Approval
 
-### Step 4: Send
+Show draft + recipients. User picks: `1` send / `2` edit / `3` regenerate / `4` cancel. **Never auto-send.**
 
-| Channel | Reference | Method |
-|---|---|---|
-| Email | [references/send-email.md](references/send-email.md) | SMTP via scripts/email-client.py |
-| LINE | [references/send-line.md](references/send-line.md) | LINE Bot MCP broadcast |
-| LinkedIn | [references/send-linkedin.md](references/send-linkedin.md) | Playwright → LinkedIn web |
+## Step 4: Send
 
-Each channel independent — if one fails, continue.
+Email (SMTP), LINE (broadcast MCP), LinkedIn (Playwright DM). Each independent — if one fails, continue.
 
-### Step 5: Summary
+## Rules
 
-Print delivery summary (✅ / ❌ / ⚠️ per channel).
-
-## Hard rules
-
-1. Never send without explicit approval at Step 3.
-2. Never fabricate — every item must trace to raw data.
-3. Never skip init — all services must be ✅ first.
-4. Never re-fetch during regenerate.
-5. Never hardcode config — read from `.env`.
-6. Never ask user to choose during init — auto-do everything, only pause for physical interaction (password, SMS, `/mcp`).
-7. **Browser fallback chain** — plugin tools are DEFERRED and must be loaded first:
-   a. Call `ToolSearch("chrome-devtools navigate")` to load Chrome DevTools tools
-   b. Call `ToolSearch("playwright navigate")` to load Playwright tools
-   c. Try Chrome DevTools `navigate_page` → if error → try Playwright `browser_navigate`
-   **Only use tools containing `chrome-devtools` or `playwright`. NEVER use "Claude in Chrome", `open` bash, or anything else.** NEVER stop after one fails — try ALL.
-8. **Headless by default** — only show a visible browser window when the user MUST physically type (login password, SMS code). All other browser operations MUST use headless/invisible browser.
-9. **NEVER use AskUserQuestion during init.** Do NOT show option menus, radio buttons, or skip buttons. Print plain text messages only. If user must act (login, /mcp), print a simple message and wait for their next message — do NOT create interactive UI elements.
+1. Never send without approval.
+2. Never fabricate — raw data only.
+3. Never ask user to choose during init — just do it.
