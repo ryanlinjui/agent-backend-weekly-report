@@ -44,4 +44,5 @@ Email (SMTP), LINE (broadcast MCP), LinkedIn (Playwright DM). Each independent �
 
 1. Never send without approval.
 2. Never fabricate — raw data only.
-3. Never ask user to choose during init — just do it.
+3. Never ask user to choose during init — just do it. **NEVER use AskUserQuestion tool.** Print plain text only.
+4. **ALL init must complete before ANY fetch.** Do NOT start fetching data while services are still ❌. Finish Step 0 entirely first.
