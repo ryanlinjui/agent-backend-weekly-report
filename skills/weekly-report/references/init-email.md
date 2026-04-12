@@ -6,15 +6,29 @@
 
 Test SMTP with `scripts/email-client.py`. If OK → ✅. If auth error → needs App Password. If `EMAIL_USER` empty → ask user for email address (the ONLY question allowed).
 
-## Browser tool fallback chain
+## Browser tool fallback chain — MANDATORY
 
-For ALL browser operations in this init, try tools in this order. **Do NOT stop if the first tool fails — silently try the next:**
+When you need to open a URL, you MUST try ALL three options before giving manual instructions. **The most common mistake is stopping after the first one fails.**
 
-1. **Chrome DevTools MCP** (`navigate_page`, `click`, `fill`, `take_snapshot`)
-2. **Playwright login** (`playwright-login` — headed, visible browser)
-3. **Playwright headless** (`playwright-headless` — if no login needed)
+```
+Step A: Try Chrome DevTools MCP
+  Call: mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page
+  If error → DO NOT STOP. Go to Step B.
 
-If ALL three fail → tell user which URL to open manually, but still try to automate everything else.
+Step B: Try Playwright login (headed browser)
+  Call: mcp__playwright-login__browser_navigate
+  If error → DO NOT STOP. Go to Step C.
+
+Step C: Try Playwright headless
+  Call: mcp__playwright-headless__browser_navigate
+  If error → ONLY NOW tell user to open URL manually.
+```
+
+For subsequent actions (click, fill, snapshot), use whichever tool succeeded above:
+- Chrome DevTools: `mcp__plugin_chrome-devtools-mcp_chrome-devtools__click`, `__fill`, `__take_snapshot`
+- Playwright: `mcp__playwright-login__browser_click`, `__browser_type`, `__browser_snapshot`
+
+**You MUST call Step B if Step A fails. NEVER skip to manual instructions after only one attempt.**
 
 ## Init steps
 

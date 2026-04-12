@@ -3,13 +3,14 @@
 > **Rule:** NEVER ask the user to choose or make decisions. Try every approach automatically. If one fails, silently try the next. Only pause when user must physically act (password, SMS, /mcp). After they act, immediately continue.
 > **Claude Desktop:** No terminal available. Use tool calls and file edits instead of Bash/CLI. For MCP install, edit `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
-## Browser tool fallback chain
+## Browser tool fallback chain — MANDATORY
 
-For ALL browser operations, try in order (do NOT stop if one fails):
-1. **Chrome DevTools MCP** (navigate_page, click, fill, take_snapshot)
-2. **Playwright login** (playwright-login — headed, visible)
-3. **Playwright headless** (playwright-headless — invisible)
-If ALL fail → tell user the URL, but keep trying to automate.
+```
+Step A: mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page → if error → Step B
+Step B: mcp__playwright-login__browser_navigate → if error → Step C
+Step C: mcp__playwright-headless__browser_navigate → if error → manual URL only now
+```
+**You MUST call Step B if Step A fails. NEVER skip to manual instructions after only one attempt.**
 ## Check
 
 Are `mcp__linkedin__*` tools available?

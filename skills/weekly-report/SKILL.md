@@ -82,4 +82,8 @@ Print delivery summary (✅ / ❌ / ⚠️ per channel).
 4. Never re-fetch during regenerate.
 5. Never hardcode config — read from `.env`.
 6. Never ask user to choose during init — auto-do everything, only pause for physical interaction (password, SMS, `/mcp`).
-7. **Browser fallback chain** — for ANY browser operation, try in order: Chrome DevTools MCP → playwright-login (headed) → playwright-headless. Do NOT stop if the first tool fails — silently try the next. Never tell user "browser not connected" without trying ALL options first.
+7. **Browser fallback chain** — for ANY browser operation, you MUST try ALL three in order:
+   `mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page` → if error →
+   `mcp__playwright-login__browser_navigate` → if error →
+   `mcp__playwright-headless__browser_navigate` → if error → only then manual URL.
+   **NEVER show manual instructions after only trying one tool.** The most common mistake is stopping after Chrome DevTools fails.
