@@ -19,7 +19,7 @@ Use detected language for ALL output.
 
 ### Step 0: Init & health check
 
-Read `.env`. For each missing/invalid key, follow its init reference **automatically** — no asking, no options, no skipping:
+Read `.env`. **Before marking any service as ❌, use `ToolSearch` to check if its tools already exist** — plugin MCPs from `.mcp.json` are auto-installed. Try calling the tool first; only mark ❌ if the call actually fails. For each failing service, follow its init reference — no asking, no options, no AskUserQuestion:
 
 1. [init-github.md](references/init-github.md)
 2. [init-email.md](references/init-email.md)
