@@ -9,9 +9,9 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 ## Step 0: Init
 
-**All state lives in the working tree** — `config.json`, `.browser-session/`, `.mcp.json`. Never write to global/user-level paths. This enables scheduled tasks with a fixed working directory.
+**All state lives in this skill's folder** (`skills/weekly-report/`): `config.json`, `.browser-session/`, and LINE Bot MCP config in project `.mcp.json`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
 
-**First, read `config.json` to check which services are already configured (skip their init). Then scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
+**First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init). Then scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
 
 ### Phase 1: Check services (no browser)
 

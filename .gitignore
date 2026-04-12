@@ -1,5 +1,6 @@
 .env
-config.json
+skills/weekly-report/config.json
+skills/weekly-report/.browser-session/
 .claude/
 .playwright-mcp/
 .browser-session/
