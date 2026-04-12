@@ -9,7 +9,9 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 ## Step 0: Init
 
-**First, read `.env` to check which services are already configured (skip their init). Then scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
+**All state lives in the working tree** — `config.json`, `.browser-session/`, `.mcp.json`. Never write to global/user-level paths. This enables scheduled tasks with a fixed working directory.
+
+**First, read `config.json` to check which services are already configured (skip their init). Then scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
 
 ### Phase 1: Check services (no browser)
 
@@ -25,7 +27,7 @@ After Phase 1 services are ready, ask user ONE question:
 
 **「報告要寄給誰？請提供 Email 收件人、LinkedIn 個人檔案網址。」**（LINE 不用問，broadcast 自動寄給所有 followers）
 
-Save to `.env` as `REPORT_RECIPIENTS`, `LINKEDIN_RECIPIENTS`.
+Save to `config.json` as `REPORT_RECIPIENTS`, `LINKEDIN_RECIPIENTS`.
 
 ### Phase 3: Browser login (one-time)
 

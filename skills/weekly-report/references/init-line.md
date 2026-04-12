@@ -2,22 +2,36 @@
 
 **Use Playwright MCP only.** Do NOT use "Claude in Chrome", `open` bash, or search MCP registry.
 
-## Login + Setup
+## Login (visible browser — user operates)
 
 1. Call `playwright-login` `browser_navigate` to `https://manager.line.biz` (visible browser)
 2. User logs in manually
-3. If no LINE Official Account exists → create one via the web UI
-4. If Messaging API not enabled → enable it via Settings
+3. After login succeeds, **close visible browser**
+
+## Setup (headless — agent operates)
+
+4. Switch to `playwright-headless` for all remaining steps
+5. Always create a **new** LINE Official Account for weekly report (ignore existing ones, auto-agree to all terms/conditions)
+6. Enable Messaging API via Settings (auto-agree to any terms)
+7. Disable **Auto-reply** and **Greeting message** in Settings → Response settings
 
 ## Get Channel Access Token
 
-5. Navigate to `https://developers.line.biz` → select the channel linked to the OA
-6. Messaging API tab → Issue / copy the long-lived Channel Access Token
-7. Save to `.env` as `LINE_CHANNEL_ACCESS_TOKEN`
+8. Navigate to `https://developers.line.biz` → select the channel linked to the OA
+9. Messaging API tab → Issue / copy the long-lived Channel Access Token
+10. Save to `config.json` as `line_channel_access_token`
 
 ## Install LINE Bot MCP
 
-8. Run: `claude mcp add-json line-bot '{"type":"stdio","command":"npx","args":["-y","@line/line-bot-mcp-server"],"env":{"CHANNEL_ACCESS_TOKEN":"<token>"}}'`
-9. Verify: call `get_message_quota` → returns data → done
+11. Add `line-bot` entry to `.mcp.json` in working tree:
+    ```json
+    "line-bot": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@line/line-bot-mcp-server"],
+      "env": { "CHANNEL_ACCESS_TOKEN": "<token>" }
+    }
+    ```
+12. Verify: call `get_message_quota` → returns data → done
 
 **Session saved to `.browser-session/`** — QA skill uses Playwright headless to read incoming messages from OA Manager Chat tab.
