@@ -8,27 +8,23 @@ Test SMTP with `scripts/email-client.py`. If OK → ✅. If auth error → needs
 
 ## Browser tool fallback chain — MANDATORY
 
-When you need to open a URL, you MUST try ALL three options before giving manual instructions. **The most common mistake is stopping after the first one fails.**
+When you need to open a URL, you MUST try ALL available browser tools before giving manual instructions. Tool names vary by environment (plugin prefix, standalone, etc.) — **do NOT hardcode tool names.** Instead:
 
-```
-Step A: Try Chrome DevTools MCP
-  Call: mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page
-  If error → DO NOT STOP. Go to Step B.
+### How to find and try browser tools
 
-Step B: Try Playwright login (headed browser)
-  Call: mcp__playwright-login__browser_navigate
-  If error → DO NOT STOP. Go to Step C.
+1. Use `ToolSearch` to find available browser tools: search for `navigate` or `browser_navigate` or `navigate_page`
+2. Try EVERY browser tool found, in this priority order:
+   - **Chrome DevTools** tools (names containing `chrome-devtools` + `navigate_page`)
+   - **Playwright login** tools (names containing `playwright-login` or `playwright` without `headless` + `browser_navigate`)
+   - **Playwright headless** tools (names containing `playwright-headless` + `browser_navigate`)
+   - **Claude in Chrome** tools (names containing `Claude_in_Chrome` + `navigate`)
+3. **ONLY after ALL browser tools have been tried and failed** → tell user to open URL manually
 
-Step C: Try Playwright headless
-  Call: mcp__playwright-headless__browser_navigate
-  If error → ONLY NOW tell user to open URL manually.
-```
-
-For subsequent actions (click, fill, snapshot), use whichever tool succeeded above:
-- Chrome DevTools: `mcp__plugin_chrome-devtools-mcp_chrome-devtools__click`, `__fill`, `__take_snapshot`
-- Playwright: `mcp__playwright-login__browser_click`, `__browser_type`, `__browser_snapshot`
-
-**You MUST call Step B if Step A fails. NEVER skip to manual instructions after only one attempt.**
+### Rules
+- **NEVER stop after the first tool fails.** Try the next one immediately.
+- **NEVER show manual instructions without trying ALL available browser tools first.**
+- **NEVER ask user "which browser tool should I use?"** — just try them all silently.
+- After one succeeds, use the same tool family for subsequent actions (click, type, snapshot).
 
 ## Init steps
 

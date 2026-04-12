@@ -5,12 +5,8 @@
 
 ## Browser tool fallback chain — MANDATORY
 
-```
-Step A: mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page → if error → Step B
-Step B: mcp__playwright-login__browser_navigate → if error → Step C
-Step C: mcp__playwright-headless__browser_navigate → if error → manual URL only now
-```
-**You MUST call Step B if Step A fails. NEVER skip to manual instructions after only one attempt.**
+Use `ToolSearch` to find available browser tools (search `navigate` or `browser_navigate`). Try ALL found tools in order: Chrome DevTools → Playwright login → Playwright headless → Claude in Chrome. **NEVER stop after one fails. NEVER show manual instructions without trying ALL.** Tool names vary by environment — do not hardcode them.
+
 ## Check
 
 Are `mcp__linkedin__*` tools available?
