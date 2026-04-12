@@ -11,8 +11,8 @@
 
 ## Get Channel Access Token
 
-5. Navigate to Settings → Messaging API → Channel Access Token
-6. Issue / copy the long-lived token
+5. Navigate to `https://developers.line.biz` → select the channel linked to the OA
+6. Messaging API tab → Issue / copy the long-lived Channel Access Token
 7. Save to `.env` as `LINE_CHANNEL_ACCESS_TOKEN`
 
 ## Install LINE Bot MCP

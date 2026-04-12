@@ -9,7 +9,7 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 ## Step 0: Init
 
-**First, scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
+**First, read `.env` to check which services are already configured (skip their init). Then scan the `<system-reminder>` tags in the conversation for the deferred tools list. A service is "not installed" ONLY if zero tools match in that list. NEVER claim a tool is unavailable without checking first.**
 
 ### Phase 1: Check services (no browser)
 
@@ -23,7 +23,7 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 After Phase 1 services are ready, ask user ONE question:
 
-**「報告要寄給誰？請提供 Email 收件人、LINE 顯示名稱、LinkedIn 個人檔案網址。」**
+**「報告要寄給誰？請提供 Email 收件人、LinkedIn 個人檔案網址。」**（LINE 不用問，broadcast 自動寄給所有 followers）
 
 Save to `.env` as `REPORT_RECIPIENTS`, `LINKEDIN_RECIPIENTS`.
 
@@ -59,7 +59,7 @@ Show draft + recipients. User picks: `1` send / `2` edit / `3` regenerate / `4` 
 
 ## Step 4: Send
 
-All via `playwright-headless` (session loaded from `.browser-session/`). Each channel independent — if one fails, try Chrome DevTools MCP as fallback, then continue others.
+Each channel independent — if one fails, try Chrome DevTools MCP as fallback, then continue others.
 
 | Channel | How |
 |---|---|
