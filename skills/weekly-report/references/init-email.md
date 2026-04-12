@@ -28,21 +28,24 @@ When you need to open a URL, you MUST try ALL available browser tools before giv
 
 ## Init steps
 
-### 1. Get email address
+### 1. Open login page
 
-If `EMAIL_USER` empty in `.env`, ask: `What email address should the report be sent from?`
-Save to `.env`. Detect provider from domain (check MX for Google Workspace: `dig MX {domain} +short | grep -q google`).
-
-### 2. Open App Password page
-
-Using the **browser fallback chain above**, navigate to the provider's App Password URL:
+Do NOT ask for email address. Open the provider's App Password page directly using the **browser fallback chain**:
 - Google: `https://myaccount.google.com/apppasswords`
 - Outlook: `https://account.live.com/proofs/AppPassword`
 - Yahoo: `https://login.yahoo.com/myc/security`
 - iCloud: `https://appleid.apple.com/account/manage`
 
-If redirected to login: `🌐 Login page opened. Please log in, then say "ok".`
+If `EMAIL_USER` is already in `.env`, detect provider from its domain. If not, default to Google (most common).
+
+The page will redirect to login. Print: `🌐 Login page opened. Please log in, then say "ok".`
 **Wait for "ok".** Login page = hands off.
+
+### 2. Extract email address from logged-in session
+
+After user logs in, take a browser snapshot of the account page. Extract the email address from the page content (e.g., "Logged in as user@example.com" or visible in the account header).
+
+Save to `.env` as `EMAIL_USER`. Detect provider from domain (check MX for Google Workspace: `dig MX {domain} +short | grep -q google`).
 
 ### 3. Enable 2FA if needed (Google)
 
@@ -62,16 +65,19 @@ No user interaction. Skill reads the password directly.
 
 Save to `.env` as `EMAIL_PASSWORD`. Test SMTP. If fail → retry from step 4.
 
-### 6. Confirm recipients
+### 6. Ask who to send to
 
-If `REPORT_RECIPIENTS` empty: ask user for email addresses. Save to `.env`. Verify format. Do NOT send actual email during init.
+If `REPORT_RECIPIENTS` empty in `.env`:
+```
+Weekly report will be sent from {EMAIL_USER}. Who should receive it? (email addresses, comma-separated)
+```
+This is the ONLY question asked during email init. Save to `.env`.
 
-Print: `✅ Email configured.`
+Print: `✅ Email configured. Sender: {EMAIL_USER}, Recipients: {REPORT_RECIPIENTS}`
 
 ## User interaction
 
-- Email address (once, if not in .env)
-- Login (once, password + 2FA)
+- Login (once) — skill extracts email address automatically after login
 - Phone verification (once, if 2FA not enabled)
-- Recipient addresses (once)
-- Everything else: skill auto-drives using browser fallback chain
+- Who to send to (once) — the ONLY question asked
+- Everything else: skill auto-drives
