@@ -24,17 +24,4 @@
 9. Select the channel linked to the OA → Messaging API tab → Issue / copy the long-lived Channel Access Token
 10. Save to `config.json` as `line_channel_access_token`
 
-## Install LINE Bot MCP
-
-11. Add `line-bot` entry to project root `.mcp.json`:
-    ```json
-    "line-bot": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@line/line-bot-mcp-server"],
-      "env": { "CHANNEL_ACCESS_TOKEN": "<token>" }
-    }
-    ```
-12. Verify: call `get_message_quota` → returns data → done
-
 **Session saved to `.browser-session/`** — QA skill uses Playwright headless to read incoming messages from OA Manager Chat tab.

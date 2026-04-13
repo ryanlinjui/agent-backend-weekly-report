@@ -9,9 +9,9 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 ## Step 0: Init
 
-**All state lives in this skill's root folder**: `config.json`, `.browser-session/`, and MCP config in `.mcp.json`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
+**All state lives in this skill's root folder**: `config.json` and `.browser-session/`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
 
-**Playwright, Slack, Notion are ALL pre-configured in `.mcp.json`. NEVER check if they're installed. NEVER try to install them. NEVER call any MCP tool until Step 1. Just trust they exist and use them when needed.**
+**Playwright, Slack, Notion MCP tools are pre-configured via manifest. NEVER check if they're installed. NEVER try to install them. NEVER call any MCP tool until Step 1. Just trust they exist and use them when needed.**
 
 First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init).
 
