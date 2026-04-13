@@ -7,6 +7,14 @@ description: Generate and send a weekly report from GitHub, Slack, and Notion. D
 
 Auto-detect user language from OS locale or their message. Use that language for all output.
 
+## Pre-flight
+
+**Skip this step if running from `/loop` (scheduled/recurring execution).** Only applies to interactive (user-initiated) runs.
+
+Before doing anything else, ask the user: "Ready to start?" via `AskUserQuestion` with `options: ["Yes"]`. Wait for the user to respond. This forces a second conversation iteration so that MCP tools (Playwright, Slack, Notion, etc.) are fully loaded before any work begins.
+
+**Do NOT call any tool or run any command before the user responds.**
+
 ## Step 0: Init
 
 **All state lives in this skill's root folder**: `config.json` and `.browser-session/`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
