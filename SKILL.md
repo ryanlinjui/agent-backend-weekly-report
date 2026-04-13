@@ -114,7 +114,7 @@ Each channel independent. On failure:
 | Channel | How |
 |---|---|
 | Email | Playwright headless → open email webmail → Compose → fill To / Subject / Body → Send → screenshot sent confirmation |
-| LINE | LINE Bot MCP `broadcast_text_message` → then Playwright headless open LINE OA Manager chat to screenshot the sent message |
+| LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'` (token from `config.json`) → then Playwright headless open LINE OA Manager chat to screenshot the sent message |
 | LinkedIn | Playwright headless → LinkedIn: open recipient profile → Message → send DM → screenshot sent confirmation |
 
 ## Step 5: Q&A Auto-Check
