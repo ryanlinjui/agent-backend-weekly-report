@@ -1,6 +1,6 @@
 ---
 name: weekly-report
-description: Generate and send a weekly report from GitHub, Slack, and Notion. Delivers via Email, LINE, LinkedIn. Use when user says "weekly report", "週報", or similar.
+description: Generate and send a weekly report from GitHub, Slack, and Notion. Delivers via Email, LINE, LinkedIn. Includes Q&A auto-check loop. Use when user says "weekly report", "週報", "qa", "check replies", "回覆", or similar.
 ---
 
 # Weekly Report
@@ -9,7 +9,7 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 ## Step 0: Init
 
-**All state lives in this skill's folder** (`skills/weekly-report/`): `config.json`, `.browser-session/`, and LINE Bot MCP config in project `.mcp.json`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
+**All state lives in this skill's root folder**: `config.json`, `.browser-session/`, and MCP config in `.mcp.json`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
 
 **Playwright, Slack, Notion are ALL pre-configured in `.mcp.json`. NEVER check if they're installed. NEVER try to install them. NEVER call any MCP tool until Step 1. Just trust they exist and use them when needed.**
 
@@ -70,6 +70,26 @@ Each channel independent — if one fails, try Chrome DevTools MCP as fallback, 
 | Email | Playwright headless → open email webmail → Compose → fill To / Subject / Body → Send → screenshot sent confirmation |
 | LINE | LINE Bot MCP `broadcast_text_message` → then Playwright headless open LINE OA Manager chat to screenshot the sent message |
 | LinkedIn | Playwright headless → LinkedIn: open recipient profile → Message → send DM → screenshot sent confirmation |
+
+## Step 5: Q&A Auto-Check
+
+After sending, offer to start a Q&A monitoring loop that checks for replies every 15 minutes using the `/loop` tool.
+
+**How it works:**
+
+1. Use `/loop 15m` to schedule recurring checks
+2. Each check cycle:
+   - **Email**: `playwright-headless` → open email inbox → search replies to "Weekly Report" subject → read new replies → compose and send response → screenshot
+   - **LINE**: `playwright-headless` → LINE OA Manager → Chat tab → check new messages → reply directly in chat → screenshot
+3. If session expired (login page appears), switch to `playwright-login` for user to re-login, then back to headless
+4. Fallback: Chrome DevTools MCP if Playwright fails
+5. Show all screenshots as proof
+6. Print summary of questions answered
+7. **Always call `browser_close` after each check cycle**
+
+**Reply rules:** Reply in the user's voice — analyze their Slack messages to match their tone. Every answer must trace to the report's raw data. Never fabricate.
+
+**The loop continues until the user stops it.** Each cycle is independent — if one channel fails, continue checking others.
 
 ## Rules
 

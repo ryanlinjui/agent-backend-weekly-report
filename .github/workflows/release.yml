@@ -1,0 +1,29 @@
+name: Package and Release .skill
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package .skill
+        run: |
+          zip -r weekly-report.skill \
+            SKILL.md \
+            references/ \
+            .mcp.json \
+            -x '*.DS_Store'
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: weekly-report.skill
+          generate_release_notes: true

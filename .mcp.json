@@ -3,12 +3,12 @@
     "playwright-login": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--user-data-dir", "skills/weekly-report/.browser-session"]
+      "args": ["-y", "@playwright/mcp@latest", "--user-data-dir", ".browser-session"]
     },
     "playwright-headless": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--headless", "--user-data-dir", "skills/weekly-report/.browser-session"]
+      "args": ["-y", "@playwright/mcp@latest", "--headless", "--user-data-dir", ".browser-session"]
     },
     "slack": {
       "type": "http",
