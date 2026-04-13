@@ -2,6 +2,8 @@
 
 **Use Playwright MCP only.** Do NOT use "Claude in Chrome", `open` bash, or search MCP registry.
 
+**NEVER ask the user to provide the Channel Access Token. The agent must obtain it via browser automation from LINE Developers.**
+
 ## Login (visible browser — user operates)
 
 1. Call `playwright-login` `browser_navigate` to `https://manager.line.biz` (visible browser)

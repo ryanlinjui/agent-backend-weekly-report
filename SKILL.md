@@ -63,7 +63,7 @@ For each service, navigate with `playwright-headless` first. A previous session 
 | LINE OA Manager | `https://manager.line.biz` | account ID or linked email | confirmed by user |
 | LinkedIn | `https://www.linkedin.com` | profile URL or email from account settings | confirmed by user |
 
-See [init-email.md](references/init-email.md) and [init-line.md](references/init-line.md) for details.
+See [init-email.md](references/init-email.md) and [init-line.md](references/init-line.md) for details. **For LINE: the agent must obtain the Channel Access Token itself via browser automation from LINE Developers — NEVER ask the user to provide it.**
 
 **Session persists across runs.** Subsequent operations use `playwright-headless` with the same `.browser-session/` — no re-login needed.
 
