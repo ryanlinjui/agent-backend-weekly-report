@@ -42,15 +42,26 @@ After Phase 1 services are ready:
 3. Ask who to send the report to — Email recipients. Save as `REPORT_RECIPIENTS` to `config.json`.
 4. Ask for LinkedIn profile URLs of recipients. Save as `LINKEDIN_RECIPIENTS` to `config.json`. (LINE uses broadcast to all followers — no need to ask.)
 
-### Phase 3: Browser login (one-time)
+### Phase 3: Browser login & verify accounts
 
-Use `playwright-login` to open each service. User logs in manually. Session auto-saved to `.browser-session/` via `--user-data-dir`. **Login only — NEVER create new accounts on any platform.**
+**Login only — NEVER create new accounts on any platform.**
 
-| Service | URL | Done when |
-|---|---|---|
-| Email | User's email provider webmail (e.g. Gmail, Outlook, Yahoo) | Inbox loads |
-| LINE OA Manager | `https://manager.line.biz` | Dashboard loads |
-| LinkedIn | `https://www.linkedin.com` | Feed loads (or use LinkedIn MCP if available) |
+For each service, navigate with `playwright-headless` first. A previous session may exist but belong to someone else — **do NOT assume it is the user's.**
+
+**For each service:**
+1. Open the URL with `playwright-headless`
+2. If already logged in → read the account identifier (email, username, account ID — **NEVER rely on display name alone**) → show to user via `AskUserQuestion` with `options: ["Yes, it's mine", "No, wrong account"]`
+3. If wrong account or not logged in → **log out first if needed** → switch to `playwright-login` (visible browser) for user to log in manually → close visible browser
+4. Save verified identity to `config.json`
+
+| Service | URL | Verify by | Done when |
+|---|---|---|---|
+| GitHub | — (use `gh` CLI) | `gh api user --jq '.login, .email'` | login and email confirmed |
+| Slack | — (use Slack MCP) | authenticated user email | email confirmed |
+| Notion | — (use Notion MCP) | `notion-get-users` user email | email confirmed |
+| Email | `email_webmail_url` from `config.json` | logged-in email address | matches `email_user` |
+| LINE OA Manager | `https://manager.line.biz` | account ID or linked email | confirmed by user |
+| LinkedIn | `https://www.linkedin.com` | profile URL or email from account settings | confirmed by user |
 
 See [init-email.md](references/init-email.md) and [init-line.md](references/init-line.md) for details.
 
@@ -59,23 +70,6 @@ See [init-email.md](references/init-email.md) and [init-line.md](references/init
 **Browser rules:** Only use Playwright. Visible browser for login only. Headless for everything else. Fallback: Chrome DevTools MCP if Playwright fails. Do NOT use `open` bash or anything else.
 
 **ALL init must complete before Step 1.**
-
-### Phase 4: Verify account identities
-
-For each browser-based platform, the session may belong to someone else. **Do NOT assume the current session is the user's.** Read the logged-in account identifier and show it to the user for confirmation via `AskUserQuestion` with `options: ["Yes", "No"]`. If "No" → log out of the current session first, then re-login via `playwright-login`.
-
-**Verify by unique account identifier (email address, username, account ID) — NEVER rely on display name alone.**
-
-| Platform | How to verify |
-|---|---|---|
-| GitHub | `gh api user --jq '.login, .email'` — show to user and confirm |
-| Slack | Slack MCP — get authenticated user email — show to user and confirm |
-| Notion | Notion MCP `notion-get-users` — get user email — show to user and confirm |
-| Email | `playwright-headless` → navigate to `email_webmail_url` → read the logged-in email address — show to user and confirm |
-| LINE | `playwright-headless` → LINE OA Manager → read account ID or linked email — show to user and confirm |
-| LinkedIn | `playwright-headless` → read profile URL or email from account settings — show to user and confirm |
-
-If wrong → **log out first**, then re-login via `playwright-login`. Save all verified identities to `config.json`.
 
 ### Init Summary
 
@@ -114,7 +108,7 @@ Show draft + recipients. Use `AskUserQuestion` with `options: ["Send", "Edit", "
 
 > REQUIRES: Step 3 approved (user chose "Send")
 
-Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), verify the logged-in account matches the expected identity in `config.json`.** Sessions may carry a different account from previous use. If mismatched → re-login via `playwright-login`.
+Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), first navigate with `playwright-headless` and verify the logged-in account matches the expected identity in `config.json` (by email, username, or account ID — not display name).** Sessions may carry a different account from previous use. If mismatched → log out first, then re-login via `playwright-login`.
 
 On failure:
 1. Read the error message to diagnose the cause
@@ -140,16 +134,16 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 **How it works:**
 
 1. Use `/loop 15m` to schedule recurring checks
-2. Each check cycle:
-   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → search replies to "Weekly Report" subject → read new replies → compose and send response → screenshot. Agent adapts to the actual platform.
-   - **LINE**: `playwright-headless` → LINE OA Manager → Chat tab → check new messages → reply directly in chat → screenshot
-3. If session expired (login page appears), switch to `playwright-login` for user to re-login, then back to headless
+2. **You MUST check ALL channels every cycle. Do NOT skip any channel.** Verify logged-in account before operating each channel (by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
+   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → screenshot
+   - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → Chat tab → check new messages → screenshot
+3. If session expired or wrong account, switch to `playwright-login` for user to re-login, then back to headless
 4. Fallback: Chrome DevTools MCP if Playwright fails
 5. Show all screenshots as proof
-6. Print summary of questions answered
+6. Print summary of new messages found
 7. **Always call `browser_close` after each check cycle**
 
-**Reply rules:** Reply in the user's voice — analyze their Slack messages to match their tone. Every answer must trace to the report's raw data. Never fabricate.
+**Do NOT auto-reply to any messages.** Only report new messages to the user. The user decides how to respond.
 
 **The loop continues until the user stops it.** Each cycle is independent — if one channel fails, continue checking others.
 
