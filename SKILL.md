@@ -27,10 +27,12 @@ First, read `config.json` (same folder as this SKILL.md) to check which services
 
 After Phase 1 services are ready:
 
-1. Auto-detect sender email: run `gh api user --jq '.email'`. If available, show it and ask "Is this correct?" via `AskUserQuestion` with `options: ["Yes", "No"]`. If "No" or unavailable, ask user to type their email.
-2. Ask (in detected language): who to send the report to? Provide Email recipients and LinkedIn profile URLs. (LINE uses broadcast to all followers — no need to ask.)
+**Ask one question at a time. Wait for each answer before asking the next.**
 
-Save sender as `email_user`, recipients as `REPORT_RECIPIENTS`, `LINKEDIN_RECIPIENTS` to `config.json`.
+1. Auto-detect sender email: run `gh api user --jq '.email'`. If available, show it and ask "Is this correct?" via `AskUserQuestion` with `options: ["Yes", "No"]`. If "No" or unavailable, ask user to type their email. Save as `email_user` to `config.json`.
+2. Ask which email platform or webmail the user uses to send/read email (e.g. Gmail, Outlook, Yahoo, custom webmail, etc.). If the platform can be inferred from the email domain (e.g. `@gmail.com` → Gmail), confirm with the user. Otherwise ask them to provide the webmail URL. Save as `email_platform` (e.g. `"gmail"`, `"outlook"`, `"yahoo"`, `"custom"`) and `email_webmail_url` (e.g. `"https://mail.google.com"`) to `config.json`.
+3. Ask who to send the report to — Email recipients. Save as `REPORT_RECIPIENTS` to `config.json`.
+4. Ask for LinkedIn profile URLs of recipients. Save as `LINKEDIN_RECIPIENTS` to `config.json`. (LINE uses broadcast to all followers — no need to ask.)
 
 ### Phase 3: Browser login (one-time)
 
@@ -69,14 +71,14 @@ If any identity is wrong, re-login via `playwright-login` or reconfigure the MCP
 
 After all phases complete, print a delivery summary table (values from verified identities in `config.json`):
 
-| Platform | Account | To |
-|---|---|---|
-| GitHub | `{github_user}` (`{github_name}`) | — (data source) |
-| Slack | `{slack_user}` @ `{slack_workspace}` | — (data source) |
-| Notion | `{notion_user}` | — (data source) |
-| Email | `{email_user}` | `{REPORT_RECIPIENTS}` |
-| LINE | `{line_account_name}` | All followers (broadcast) |
-| LinkedIn | `{linkedin_profile_name}` | `{LINKEDIN_RECIPIENTS}` |
+| Platform | Via | Account | To |
+|---|---|---|---|
+| GitHub | `gh` CLI | `{github_user}` (`{github_name}`) | — (data source) |
+| Slack | Slack MCP | `{slack_user}` @ `{slack_workspace}` | — (data source) |
+| Notion | Notion MCP | `{notion_user}` | — (data source) |
+| Email | `{email_platform}` | `{email_user}` | `{REPORT_RECIPIENTS}` |
+| LINE | LINE Broadcast API | `{line_account_name}` | All followers (broadcast) |
+| LinkedIn | Playwright | `{linkedin_profile_name}` | `{LINKEDIN_RECIPIENTS}` |
 
 **⛔ STOP — If ANY service above is not configured, do NOT proceed past this point. Complete all phases of Step 0 first.**
 
@@ -113,7 +115,7 @@ Each channel independent. On failure:
 
 | Channel | How |
 |---|---|
-| Email | Playwright headless → open email webmail → Compose → fill To / Subject / Body → Send → screenshot sent confirmation |
+| Email | Read `email_platform` and `email_webmail_url` from `config.json` → Playwright headless → navigate to the saved webmail URL → Compose → fill To / Subject / Body → Send → screenshot sent confirmation. Agent must adapt its selectors and compose flow to the actual platform. |
 | LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'` (token from `config.json`) → then Playwright headless open LINE OA Manager chat to screenshot the sent message |
 | LinkedIn | Playwright headless → LinkedIn: open recipient profile → Message → send DM → screenshot sent confirmation |
 
@@ -127,7 +129,7 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 
 1. Use `/loop 15m` to schedule recurring checks
 2. Each check cycle:
-   - **Email**: `playwright-headless` → open email inbox → search replies to "Weekly Report" subject → read new replies → compose and send response → screenshot
+   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → search replies to "Weekly Report" subject → read new replies → compose and send response → screenshot. Agent adapts to the actual platform.
    - **LINE**: `playwright-headless` → LINE OA Manager → Chat tab → check new messages → reply directly in chat → screenshot
 3. If session expired (login page appears), switch to `playwright-login` for user to re-login, then back to headless
 4. Fallback: Chrome DevTools MCP if Playwright fails
