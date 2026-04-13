@@ -134,16 +134,16 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 **How it works:**
 
 1. Use `/loop 15m` to schedule recurring checks
-2. **You MUST check ALL channels every cycle. Do NOT skip any channel.** Verify logged-in account before operating each channel (by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
-   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → screenshot
-   - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → Chat tab → check new messages → screenshot
+2. **You MUST check ALL channels every cycle. Do NOT skip any channel.** Verify logged-in account before operating each channel (check by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
+   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → compose and send response → screenshot. Agent adapts to the actual platform.
+   - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → go to Chat tab → check for new messages → reply directly in chat → screenshot. **This is mandatory — do NOT skip LINE even if Email had no replies.**
 3. If session expired or wrong account, switch to `playwright-login` for user to re-login, then back to headless
 4. Fallback: Chrome DevTools MCP if Playwright fails
 5. Show all screenshots as proof
-6. Print summary of new messages found
+6. Print summary of questions answered
 7. **Always call `browser_close` after each check cycle**
 
-**Do NOT auto-reply to any messages.** Only report new messages to the user. The user decides how to respond.
+**Reply rules:** Every answer must trace to the report's raw data. Never fabricate.
 
 **The loop continues until the user stops it.** Each cycle is independent — if one channel fails, continue checking others.
 
