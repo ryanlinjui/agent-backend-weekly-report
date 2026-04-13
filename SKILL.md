@@ -62,18 +62,20 @@ See [init-email.md](references/init-email.md) and [init-line.md](references/init
 
 ### Phase 4: Verify account identities
 
-Confirm each platform's active session is the intended account. **Verify by unique account identifier (email address, username, account ID) — NEVER rely on display name alone.** Display names are not unique and can be misleading. Save all verified identities to `config.json`.
+For each browser-based platform, the session may belong to someone else. **Do NOT assume the current session is the user's.** Read the logged-in account identifier and show it to the user for confirmation via `AskUserQuestion` with `options: ["Yes", "No"]`. If "No" → log out of the current session first, then re-login via `playwright-login`.
+
+**Verify by unique account identifier (email address, username, account ID) — NEVER rely on display name alone.**
 
 | Platform | How to verify |
 |---|---|---|
-| GitHub | `gh api user --jq '.login, .email'` — match login and email |
-| Slack | Slack MCP — match workspace ID and authenticated user email |
-| Notion | Notion MCP `notion-get-users` — match user email |
-| Email | `playwright-headless` → navigate to `email_webmail_url` → read the logged-in email address and match against `email_user` |
-| LINE | `playwright-headless` → LINE OA Manager → read the account ID or linked email, not just the display name |
-| LinkedIn | `playwright-headless` → read the profile URL or email from account settings, not just the profile name |
+| GitHub | `gh api user --jq '.login, .email'` — show to user and confirm |
+| Slack | Slack MCP — get authenticated user email — show to user and confirm |
+| Notion | Notion MCP `notion-get-users` — get user email — show to user and confirm |
+| Email | `playwright-headless` → navigate to `email_webmail_url` → read the logged-in email address — show to user and confirm |
+| LINE | `playwright-headless` → LINE OA Manager → read account ID or linked email — show to user and confirm |
+| LinkedIn | `playwright-headless` → read profile URL or email from account settings — show to user and confirm |
 
-If any identity is wrong, re-login via `playwright-login` or reconfigure the MCP connector before proceeding.
+If wrong → **log out first**, then re-login via `playwright-login`. Save all verified identities to `config.json`.
 
 ### Init Summary
 
