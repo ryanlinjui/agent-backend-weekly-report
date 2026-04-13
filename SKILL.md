@@ -50,6 +50,34 @@ See [init-email.md](references/init-email.md) and [init-line.md](references/init
 
 **ALL init must complete before Step 1.**
 
+### Phase 4: Verify account identities
+
+Confirm each platform's active session is the intended account. Save all verified identities to `config.json`.
+
+| Platform | How to verify |
+|---|---|---|
+| GitHub | `gh api user --jq '.login, .name, .email'` |
+| Slack | Slack MCP — get workspace name and authenticated user |
+| Notion | Notion MCP `notion-get-users` — get current user name |
+| Email | Already confirmed in Phase 2 + Phase 3 login |
+| LINE | `playwright-headless` — read account name from LINE interface after login |
+| LinkedIn | `playwright-headless` — read profile name from LinkedIn page after login |
+
+If any identity is wrong, re-login via `playwright-login` or reconfigure the MCP connector before proceeding.
+
+### Init Summary
+
+After all phases complete, print a delivery summary table (values from verified identities in `config.json`):
+
+| Platform | Account | To |
+|---|---|---|
+| GitHub | `{github_user}` (`{github_name}`) | — (data source) |
+| Slack | `{slack_user}` @ `{slack_workspace}` | — (data source) |
+| Notion | `{notion_user}` | — (data source) |
+| Email | `{email_user}` | `{REPORT_RECIPIENTS}` |
+| LINE | `{line_account_name}` | All followers (broadcast) |
+| LinkedIn | `{linkedin_profile_name}` | `{LINKEDIN_RECIPIENTS}` |
+
 **⛔ STOP — If ANY service above is not configured, do NOT proceed past this point. Complete all phases of Step 0 first.**
 
 ## Step 1: Fetch
