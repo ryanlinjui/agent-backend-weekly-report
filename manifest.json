@@ -9,9 +9,9 @@
       "optional": false
     },
     {
-      "type": "mcp-server",
-      "name": "playwright",
-      "source": "npx @playwright/mcp@latest",
+      "type": "cli-tool",
+      "name": "opencli",
+      "source": "npm install -g @jackwener/opencli",
       "optional": false
     },
     {
@@ -24,12 +24,6 @@
       "type": "mcp-server",
       "name": "notion",
       "source": "https://mcp.notion.com/mcp",
-      "optional": false
-    },
-    {
-      "type": "mcp-server",
-      "name": "chrome-devtools",
-      "source": "npx chrome-devtools-mcp@latest",
       "optional": false
     }
   ],
