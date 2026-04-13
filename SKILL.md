@@ -44,7 +44,7 @@ After Phase 1 services are ready:
 
 ### Phase 3: Browser login (one-time)
 
-Use `playwright-login` to open each service. User logs in manually. Session auto-saved to `.browser-session/` via `--user-data-dir`.
+Use `playwright-login` to open each service. User logs in manually. Session auto-saved to `.browser-session/` via `--user-data-dir`. **Login only — NEVER create new accounts on any platform.**
 
 | Service | URL | Done when |
 |---|---|---|
