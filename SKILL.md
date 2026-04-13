@@ -1,5 +1,5 @@
 ---
-name: agent-backend-weekly-report
+name: weekly-report
 description: Generate and send a weekly report from GitHub, Slack, and Notion. Delivers via Email, LINE, LinkedIn. Includes Q&A auto-check loop. Use when user says "weekly report", "週報", "qa", "check replies", "回覆", or similar.
 ---
 
