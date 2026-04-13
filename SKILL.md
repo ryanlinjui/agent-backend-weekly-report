@@ -61,7 +61,7 @@ Confirm each platform's active session is the intended account. Save all verifie
 | GitHub | `gh api user --jq '.login, .name, .email'` |
 | Slack | Slack MCP — get workspace name and authenticated user |
 | Notion | Notion MCP `notion-get-users` — get current user name |
-| Email | Already confirmed in Phase 2 + Phase 3 login |
+| Email | `playwright-headless` → navigate to `email_webmail_url` → check logged-in account matches `email_user` |
 | LINE | `playwright-headless` — read account name from LINE interface after login |
 | LinkedIn | `playwright-headless` — read profile name from LinkedIn page after login |
 
@@ -104,9 +104,11 @@ Show draft + recipients. Use `AskUserQuestion` with `options: ["Send", "Edit", "
 
 > REQUIRES: Step 3 approved (user chose "Send")
 
-Each channel independent. On failure:
+Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), verify the logged-in account matches the expected identity in `config.json`.** Sessions may carry a different account from previous use. If mismatched → re-login via `playwright-login`.
+
+On failure:
 1. Read the error message to diagnose the cause
-2. If session expired → re-login via `playwright-login`, then retry
+2. If session expired or wrong account → re-login via `playwright-login`, then retry
 3. If element not found → take screenshot, retry once with updated selectors
 4. If still failing → try Chrome DevTools MCP as fallback
 5. If all attempts fail → report what failed and why in plain language, continue other channels
