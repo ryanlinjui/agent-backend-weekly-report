@@ -11,9 +11,9 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 **Skip this step if running from `/loop` (scheduled/recurring execution).** Only applies to interactive (user-initiated) runs.
 
-Before doing anything else, ask the user: "Ready to start?" via `AskUserQuestion` with `options: ["Yes"]`. Wait for the user to respond. This forces a second conversation iteration so that MCP tools (Playwright, Slack, Notion, etc.) are fully loaded before any work begins.
+Before doing anything else, output a message asking the user if they're ready to start (e.g. "Ready to start? Type anything to continue."). Do NOT use `AskUserQuestion` — the user must reply in the chat input box to trigger a second conversation iteration. This ensures MCP tools (Playwright, Slack, Notion, etc.) are fully loaded before any work begins.
 
-**Do NOT call any tool or run any command before the user responds.**
+**Do NOT call any tool or run any command until the user replies.**
 
 ## Step 0: Init
 
