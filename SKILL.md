@@ -62,16 +62,16 @@ See [init-email.md](references/init-email.md) and [init-line.md](references/init
 
 ### Phase 4: Verify account identities
 
-Confirm each platform's active session is the intended account. Save all verified identities to `config.json`.
+Confirm each platform's active session is the intended account. **Verify by unique account identifier (email address, username, account ID) — NEVER rely on display name alone.** Display names are not unique and can be misleading. Save all verified identities to `config.json`.
 
 | Platform | How to verify |
 |---|---|---|
-| GitHub | `gh api user --jq '.login, .name, .email'` |
-| Slack | Slack MCP — get workspace name and authenticated user |
-| Notion | Notion MCP `notion-get-users` — get current user name |
-| Email | `playwright-headless` → navigate to `email_webmail_url` → check logged-in account matches `email_user` |
-| LINE | `playwright-headless` — read account name from LINE interface after login |
-| LinkedIn | `playwright-headless` — read profile name from LinkedIn page after login |
+| GitHub | `gh api user --jq '.login, .email'` — match login and email |
+| Slack | Slack MCP — match workspace ID and authenticated user email |
+| Notion | Notion MCP `notion-get-users` — match user email |
+| Email | `playwright-headless` → navigate to `email_webmail_url` → read the logged-in email address and match against `email_user` |
+| LINE | `playwright-headless` → LINE OA Manager → read the account ID or linked email, not just the display name |
+| LinkedIn | `playwright-headless` → read the profile URL or email from account settings, not just the profile name |
 
 If any identity is wrong, re-login via `playwright-login` or reconfigure the MCP connector before proceeding.
 
