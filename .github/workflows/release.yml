@@ -19,7 +19,7 @@ jobs:
           zip -r weekly-report.skill \
             SKILL.md \
             references/ \
-            .mcp.json \
+            scripts/ \
             -x '*.DS_Store'
 
       - name: Create Release

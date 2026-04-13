@@ -1,7 +1,34 @@
 {
   "version": "1.0.0",
   "locale": "en",
-  "dependencies": {
-    "cli": ["gh"]
+  "dependencies": [
+    {
+      "type": "cli-tool",
+      "name": "gh",
+      "source": "https://cli.github.com",
+      "optional": false
+    },
+    {
+      "type": "mcp-server",
+      "name": "playwright",
+      "source": "npx @playwright/mcp@latest",
+      "optional": false
+    },
+    {
+      "type": "mcp-server",
+      "name": "slack",
+      "source": "https://mcp.slack.com/mcp",
+      "optional": false
+    },
+    {
+      "type": "mcp-server",
+      "name": "notion",
+      "source": "https://mcp.notion.com/mcp",
+      "optional": false
+    }
+  ],
+  "firstRunMessage": {
+    "en": "Weekly Report skill installed. Say \"weekly report\" to get started.",
+    "zh-TW": "週報技能已安裝。輸入「週報」開始使用。"
   }
 }

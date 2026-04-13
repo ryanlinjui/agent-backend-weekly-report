@@ -1,5 +1,5 @@
 ---
-name: weekly-report
+name: agent-backend-weekly-report
 description: Generate and send a weekly report from GitHub, Slack, and Notion. Delivers via Email, LINE, LinkedIn. Includes Q&A auto-check loop. Use when user says "weekly report", "週報", "qa", "check replies", "回覆", or similar.
 ---
 
@@ -25,11 +25,12 @@ First, read `config.json` (same folder as this SKILL.md) to check which services
 
 ### Phase 2: Ask recipients
 
-After Phase 1 services are ready, ask user ONE question:
+After Phase 1 services are ready:
 
-Ask (in detected language): who to send the report to? Provide Email recipients and LinkedIn profile URLs. (LINE uses broadcast to all followers — no need to ask.)
+1. Auto-detect sender email: run `gh api user --jq '.email'`. If available, show it and ask "Is this correct?" via `AskUserQuestion` with `options: ["Yes", "No"]`. If "No" or unavailable, ask user to type their email.
+2. Ask (in detected language): who to send the report to? Provide Email recipients and LinkedIn profile URLs. (LINE uses broadcast to all followers — no need to ask.)
 
-Save to `config.json` as `REPORT_RECIPIENTS`, `LINKEDIN_RECIPIENTS`.
+Save sender as `email_user`, recipients as `REPORT_RECIPIENTS`, `LINKEDIN_RECIPIENTS` to `config.json`.
 
 ### Phase 3: Browser login (one-time)
 
@@ -49,21 +50,38 @@ See [init-email.md](references/init-email.md) and [init-line.md](references/init
 
 **ALL init must complete before Step 1.**
 
+**⛔ STOP — If ANY service above is not configured, do NOT proceed past this point. Complete all phases of Step 0 first.**
+
 ## Step 1: Fetch
+
+> REQUIRES: Step 0 fully completed (all services configured in config.json)
 
 Compute window (`REPORT_WINDOW_DAYS` days back). Fetch from GitHub (`gh` CLI), Slack (MCP), Notion (MCP). Keep raw data.
 
 ## Step 2: Draft
 
+> REQUIRES: Step 1 completed (raw data fetched)
+
 Follow [references/report-template.md](references/report-template.md). Every item must trace to raw data. Never fabricate.
 
 ## Step 3: Approval
 
-Show draft + recipients. User picks: `1` send / `2` edit / `3` regenerate / `4` cancel. **Never auto-send.**
+> REQUIRES: Step 2 completed (draft ready)
+
+Show draft + recipients. Use `AskUserQuestion` with `options: ["Send", "Edit", "Regenerate", "Cancel"]` so the user gets clickable buttons. **Never auto-send.**
 
 ## Step 4: Send
 
-Each channel independent — if one fails, try Chrome DevTools MCP as fallback, then continue others. **After each successful send, take a screenshot as proof and show it to the user.**
+> REQUIRES: Step 3 approved (user chose "Send")
+
+Each channel independent. On failure:
+1. Read the error message to diagnose the cause
+2. If session expired → re-login via `playwright-login`, then retry
+3. If element not found → take screenshot, retry once with updated selectors
+4. If still failing → try Chrome DevTools MCP as fallback
+5. If all attempts fail → report what failed and why in plain language, continue other channels
+
+**After each successful send, take a screenshot as proof and show it to the user.**
 
 | Channel | How |
 |---|---|
@@ -72,6 +90,8 @@ Each channel independent — if one fails, try Chrome DevTools MCP as fallback, 
 | LinkedIn | Playwright headless → LinkedIn: open recipient profile → Message → send DM → screenshot sent confirmation |
 
 ## Step 5: Q&A Auto-Check
+
+> REQUIRES: Step 4 completed (at least one channel sent successfully)
 
 After sending, offer to start a Q&A monitoring loop that checks for replies every 15 minutes using the `/loop` tool.
 
@@ -95,7 +115,7 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 
 1. Never send without approval.
 2. Never fabricate — raw data only.
-3. Never ask user to choose during init — just do it. **NEVER use AskUserQuestion.** Plain text only.
+3. During init (Step 0), never ask user to choose — just do it. For approval (Step 3) and Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
 4. ALL init must complete before ANY fetch.
 5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools.
 6. **Always call `browser_close` when done.** Playwright only allows one session at a time — if not closed, other skills cannot use the browser.
