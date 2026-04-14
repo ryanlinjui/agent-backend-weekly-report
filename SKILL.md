@@ -109,7 +109,7 @@ On failure:
 
 | Channel | How |
 |---|---|
-| Email | Read `email_platform` and `email_webmail_url` from `config.json` → Playwright headless → navigate to the saved webmail URL → Compose → fill To / Subject / Body → Send. Agent must adapt its selectors and compose flow to the actual platform. |
+| Email | If `email_platform` is `gmail`: for each recipient in `REPORT_RECIPIENTS`, read the template at `scripts/gmail-send.js`, substitute `__TO__` with that single recipient, `__SUBJECT__`, `__BODY__` via `JSON.stringify`, then call `mcp__playwright-headless__browser_run_code`. One send per recipient — avoids the BCC-broadcast pattern that Gmail flags as spam, and naturally hides recipients from each other. For other platforms: navigate to `email_webmail_url` with Playwright headless and adapt selectors/flow dynamically. **Must be headless** — skill may run as a scheduled task. See [send-email.md](references/send-email.md). |
 | LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'` (token from `config.json`) — broadcast reaches all followers. |
 | LinkedIn | For each recipient: read the template at `scripts/linkedin-dm.js`, substitute `__PROFILE_URL__` and `__MESSAGE__` via `JSON.stringify`, then call `mcp__playwright-headless__browser_run_code` with the result. **Must be headless** — skill may run as a scheduled task. See [send-linkedin.md](references/send-linkedin.md). |
 
@@ -122,7 +122,7 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 **How it works:**
 
 1. Use `/loop 15m` to schedule recurring checks
-2. **You MUST check ALL channels every cycle. Do NOT skip any channel.** Verify logged-in account before operating each channel (check by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
+2. **QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST check both Email and LINE every cycle. Do NOT skip either. Verify logged-in account before operating each channel (check by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
    - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → compose and send response. Agent adapts to the actual platform.
    - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → go to Chat tab → check for new messages → reply directly in chat. **This is mandatory — do NOT skip LINE even if Email had no replies.**
 3. If session expired or wrong account, switch to `playwright-login` for user to re-login, then back to headless
