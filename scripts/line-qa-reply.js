@@ -1,16 +1,19 @@
 // Reply inside a specific LINE OA chat on `chat.line.biz`.
-// Template for the Playwright MCP `browser_run_code` tool.
+// Template run via `playwright-cli run-code`.
 //
-// Runs on `playwright-headless`. The MCP session must already be logged in
-// to LINE Business ID — prefer running `scripts/line-qa-check.js` first so
-// the SSO handshake and chat URL discovery are already settled.
+// Runs on the `weekly-report` (headless) session. The session must already
+// have LINE Business ID cookies in its --profile — prefer running
+// `scripts/line-qa-check.js` first so the SSO handshake and chat URL
+// discovery are already settled.
 //
 // Usage (from the skill):
-//   const tpl = fs.readFileSync('scripts/line-qa-reply.js', 'utf8');
-//   const code = tpl
-//     .replace('__CHAT_URL__', JSON.stringify(chatUrl))  // from line-qa-check
-//     .replace('__BODY__',     JSON.stringify(replyBody));
-//   await mcp.browser_run_code({ code });
+//   1. Read this file, replace placeholders with JSON.stringify(value):
+//        __CHAT_URL__   from line-qa-check
+//        __BODY__       the reply text
+//   2. Write the substituted code to `.pw-tmp/line-qa-reply.js`.
+//   3. Run:
+//        playwright-cli --raw -s=weekly-report run-code \
+//          --filename=.pw-tmp/line-qa-reply.js
 //
 // Returns: { sent: true } on success; throws on failure. Rule 8 applies —
 // the caller MUST verify the return is exactly { sent: true }.

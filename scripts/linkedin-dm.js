@@ -1,18 +1,16 @@
-// Send a LinkedIn DM — template for the Playwright MCP `browser_run_code` tool.
+// Send a LinkedIn DM — template run via `playwright-cli run-code`.
 //
 // How the skill uses this file:
 //   1. Read this file, replace __PROFILE_URL__ and __MESSAGE__ with JSON-encoded
 //      string literals (use JSON.stringify to escape quotes/unicode safely).
-//   2. Call mcp__playwright-headless__browser_run_code with the resulting code.
-//   3. The MCP session must already be logged into LinkedIn
-//      (handled by Step 0 Phase 3 of the skill via playwright-login).
-//
-// Usage example (from the skill):
-//   const tpl = fs.readFileSync('scripts/linkedin-dm.js', 'utf8');
-//   const code = tpl
-//     .replace('__PROFILE_URL__', JSON.stringify(profileUrl))
-//     .replace('__MESSAGE__', JSON.stringify(message));
-//   await mcp.browser_run_code({ code });
+//   2. Write the substituted code to `.pw-tmp/linkedin-dm.js` (must live under
+//      the project cwd — `run-code --filename` sandboxes to the cwd).
+//   3. Run:
+//        playwright-cli --raw -s=weekly-report run-code \
+//          --filename=.pw-tmp/linkedin-dm.js
+//      Stdout is the return value as JSON. Verify it is `{ "sent": true }`.
+//   4. The `weekly-report` session must already be open and logged in to
+//      LinkedIn (handled by Step 0 Phase 3 via `weekly-report-login`).
 
 async (page) => {
   const profileUrl = __PROFILE_URL__;

@@ -14,73 +14,33 @@ Decide which mode based on the user's activation phrase (case- and language-inse
 | Phrase (examples) | Mode | What to run |
 |---|---|---|
 | `weekly report`, `週報`, `generate report` | **Full report** | Step 0 → Step 1 → Step 2 → Step 3 → Step 4 → Step 5 (setup offer) |
-| `qa`, `check replies`, `回覆` | **QA cycle only** | Step 0 Phase 0 (MCP verify) → Step 5 `QA cycle` section only. **Skip Steps 1–4** — this entry is for scheduled ticks and ad-hoc reply sweeps, not for producing a new report. |
+| `qa`, `check replies`, `回覆` | **QA cycle only** | Step 0 Phase 0 (CLI verify) → Step 5 `QA cycle` section only. **Skip Steps 1–4** — this entry is for scheduled ticks and ad-hoc reply sweeps, not for producing a new report. |
 
 Scheduled `/schedule` tasks always invoke the **QA cycle only** mode (their prompt is one of `qa` / `check replies`). Full-report triggers are expected to be rare (once a week, user-initiated).
 
 ## Step 0: Init
 
-**All state lives in this skill's root folder** (e.g. `config.json` plus any browser session data the agent chooses to persist). Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
+**All state lives in this skill's root folder** — `config.json`, the persistent browser profile at `.browser-session/`, and substituted template temp files at `.pw-tmp/`. Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path, and all browser state travels with the skill.
 
-**Required:** `gh`, `npx`, and the Playwright MCP. Slack / Notion / Chrome DevTools MCPs are optional — skip data sources whose MCP isn't connected, and fall back to Chrome DevTools only if it's available. Phase 0 verifies the required set every run; a silent Playwright misconfig in Claude Desktop cascades into downstream failures, so it's worth checking up front.
+**Required:** `gh`, `npx`, and `@playwright/cli`. Slack / Notion MCPs are optional — skip data sources whose MCP isn't connected. Phase 0 verifies the required set every run; a missing CLI cascades into confusing downstream failures, so it's worth checking up front.
 
 First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init).
 
-### Phase 0: Verify CLI + Playwright MCP config (every run)
+### Phase 0: Verify CLI tools (every run)
 
-Run this check up front — a missing CLI or a misconfigured `claude_desktop_config.json` causes silent failures later (tool calls hang or time out with no useful error).
+Run this check up front — a missing CLI causes downstream failures with confusing error messages.
 
-**Step 0a — CLI tools.** For each, run the check command; if it fails, tell the user the exact install command for **their OS** (detect via `uname -s` / `$OSTYPE` / `%OS%`), then STOP until they confirm.
+For each tool, run the check command; if it fails, tell the user the exact install command for **their OS** (detect via `uname -s` / `$OSTYPE` / `%OS%`), then STOP until they confirm.
 
 | Tool | Check | Install (macOS) | Install (Windows) | Install (Linux) |
 |---|---|---|---|---|
 | `gh` | `gh --version` | `brew install gh` | `winget install GitHub.cli` | `apt install gh` or see <https://github.com/cli/cli#installation> |
 | Node.js / `npx` | `npx --version` | `brew install node` | `winget install OpenJS.NodeJS` | `apt install nodejs npm` / use `nvm` |
-| `@playwright/mcp` cache | `npx -y @playwright/mcp --version` (auto-installs first run) | — | — | — |
+| `@playwright/cli` | `playwright-cli --version` | `npm install -g @playwright/cli@latest` | same | same |
 
-**Step 0b — Claude Desktop MCP config.**
+After `playwright-cli --version` succeeds, ensure the browser is installed: `playwright-cli install-browser chrome` is idempotent (no-op if already installed). No Claude Desktop config to edit — unlike the old `@playwright/mcp` setup, `playwright-cli` is a direct CLI and doesn't need any entries in `claude_desktop_config.json`. Slack / Notion MCPs (optional) still need their usual MCP config if the user wants those data sources.
 
-1. Read the Claude Desktop MCP config:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-   - Linux: `~/.config/Claude/claude_desktop_config.json`
-
-2. Verify **both** `mcpServers.playwright-login` and `mcpServers.playwright-headless` are present, each with:
-   - `command` → **absolute path** to `npx` (macOS / Linux: `which npx`; Windows cmd: `where npx`; PowerShell: `Get-Command npx` — on Windows the executable is `npx.cmd`, not bare `npx`). Bare `"npx"` fails because Claude Desktop launches without a login shell PATH.
-   - `args` starting with `["-y", "@playwright/mcp", ...]`. **Never use `@playwright/mcp@latest`** — Claude Desktop has a lazy-loading race where resolving `@latest` on first call hangs and leaves the server half-initialized. Pin to the bare package name.
-   - **Same** `--user-data-dir` absolute path on both entries — this is what lets the login session from the visible server be reused by the headless server. If the paths diverge, every headless operation starts with no cookies and silently fails.
-   - `playwright-headless` additionally carries `--headless` in its args.
-
-   Expected shape (macOS / Linux example — Windows users substitute `C:\\Users\\<you>\\AppData\\Roaming\\npm\\npx.cmd` for `command` and backslash-escaped Windows paths for `--user-data-dir`):
-   ```json
-   "mcpServers": {
-     "playwright-login": {
-       "command": "/Users/<you>/.nvm/versions/node/<ver>/bin/npx",
-       "args": [
-         "-y", "@playwright/mcp",
-         "--user-data-dir", "/Users/<you>/Library/Application Support/Claude/playwright-session"
-       ]
-     },
-     "playwright-headless": {
-       "command": "/Users/<you>/.nvm/versions/node/<ver>/bin/npx",
-       "args": [
-         "-y", "@playwright/mcp",
-         "--headless",
-         "--user-data-dir", "/Users/<you>/Library/Application Support/Claude/playwright-session"
-       ]
-     }
-   }
-   ```
-
-3. If either entry is missing, uses bare `npx`, uses `@latest`, or the two `--user-data-dir` paths disagree → **STOP and walk the user through fix**:
-   a. Pre-cache the package: `npx -y @playwright/mcp --version`
-   b. Find the absolute npx path: `which npx` (macOS / Linux) / `where npx` (Windows cmd) / `Get-Command npx` (PowerShell)
-   c. Edit the config file above so both `playwright-login` and `playwright-headless` exist with matching `--user-data-dir` (keep other entries intact; Windows JSON strings need double-backslash `\\` path separators)
-   d. **Fully quit Claude Desktop** — macOS: ⌘Q or menu → Quit; Windows: right-click the tray icon → Exit; Linux: close via tray / system menu. Just closing the window is not enough — the app keeps running in the background.
-   e. **Reopen Claude Desktop and start a *new* conversation** — MCP servers are only loaded at conversation start; the existing chat will not pick up config changes
-   f. Ask the user to re-invoke the skill
-
-4. If reasonable → proceed to Phase 1.
+Once all three CLIs check out, proceed to Phase 1.
 
 ### Phase 1: Check GitHub
 
@@ -103,13 +63,36 @@ After Phase 1 services are ready:
 
 **Login only — NEVER create new accounts on any platform.**
 
-For each service, navigate with `playwright-headless` first. A previous session may exist but belong to someone else — **do NOT assume it is the user's.**
+The skill uses two `playwright-cli` sessions that share one persistent profile at `.browser-session/` (relative to this SKILL.md's folder):
+
+| Session | Mode | Purpose |
+|---|---|---|
+| `weekly-report` | headless (default) | All automated sends, QA, identity checks |
+| `weekly-report-login` | headed (`--headed`) | Manual login only (visible browser) |
+
+Both are opened with `--persistent --profile=.browser-session` so cookies persist across runs and are shared between modes. Chromium lockfiles at that path mean **only one session may be open at a time** — always `close` the current session before opening the other (Rule 6).
+
+**Session open / close idioms.** Run all `playwright-cli` commands from the skill's root folder so the `--profile` path resolves relative to cwd and `run-code --filename` paths stay inside the sandbox:
+
+```bash
+# Headless — everything except manual login
+playwright-cli -s=weekly-report open <URL> --persistent --profile=.browser-session
+
+# Headed — only for user-driven login / reCAPTCHA
+playwright-cli -s=weekly-report-login open <URL> --headed --persistent --profile=.browser-session
+
+# Close (mandatory before switching modes)
+playwright-cli -s=weekly-report close
+playwright-cli -s=weekly-report-login close
+```
+
+For each service, open the URL in the headless `weekly-report` session first. A previous session may exist but belong to someone else — **do NOT assume it is the user's.**
 
 **For each service:**
-1. Open the URL with `playwright-headless`
-2. If already logged in → read the account identifier (email, username, account ID — **NEVER rely on display name alone**) → show to user via `AskUserQuestion` with `options: ["Yes, it's mine", "No, wrong account"]`
-3. If wrong account or not logged in → **log out first if needed** → **`browser_close` the headless session** (Rule 6: required before switching mode) → switch to `playwright-login` (visible browser) → tell user which site to log in to → **block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`** (do NOT poll the page; the user needs time to complete the flow, and an AskUserQuestion is the clean handoff). After `Done`, re-read the logged-in account identifier to verify it matches expectation, then **`browser_close` the visible browser** before any subsequent headless operation.
-4. Save verified identity to `config.json`
+1. Open the URL with the `weekly-report` headless session (per the idiom above).
+2. If already logged in → read the account identifier (email, username, account ID — **NEVER rely on display name alone**) via a short `run-code` snippet → show to user via `AskUserQuestion` with `options: ["Yes, it's mine", "No, wrong account"]`.
+3. If wrong account or not logged in → **log out first if needed** → **`playwright-cli -s=weekly-report close`** (Rule 6: required before switching mode) → switch to `weekly-report-login` (headed) → navigate to the login URL → tell user which site to log in to → **block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`** (do NOT poll the page; the user needs time to complete the flow, and an AskUserQuestion is the clean handoff). After `Done`, re-read the logged-in account identifier to verify it matches expectation, then **`playwright-cli -s=weekly-report-login close`** before any subsequent headless operation.
+4. Save verified identity to `config.json`.
 
 | Service | URL | Verify by | Done when |
 |---|---|---|---|
@@ -122,9 +105,9 @@ For each service, navigate with `playwright-headless` first. A previous session 
 
 See [init-email.md](references/init-email.md) and [init-line.md](references/init-line.md) for details. **For LINE: the agent must obtain the Channel Access Token itself via browser automation from LINE Developers — NEVER ask the user to provide it.**
 
-**Session persists across runs.** Subsequent operations use `playwright-headless` with the same persisted session — no re-login needed.
+**Session persists across runs.** Subsequent operations reopen `weekly-report` with the same `.browser-session/` profile — no re-login needed.
 
-**Browser rules:** Only use Playwright. Visible browser for login only. Headless for everything else. Fallback: Chrome DevTools MCP if Playwright fails. Do NOT use `open` bash or anything else.
+**Browser rules:** Only use `@playwright/cli`. Headed session (`weekly-report-login`) for login only. Headless session (`weekly-report`) for everything else. Do NOT use `open` bash, Chrome DevTools MCP, "Claude in Chrome", or anything else to drive a browser.
 
 **ALL init must complete before Step 1.**
 
@@ -139,7 +122,7 @@ After all phases complete, print a delivery summary table (values from verified 
 | Notion | Notion MCP | `{notion_user}` | — (data source) |
 | Email | `{email_platform}` | `{email_user}` | `{REPORT_RECIPIENTS}` |
 | LINE | LINE Broadcast API | `{line_account_name}` | All followers (broadcast) |
-| LinkedIn | Playwright | `{linkedin_profile_name}` | `{LINKEDIN_RECIPIENTS}` |
+| LinkedIn | `@playwright/cli` | `{linkedin_profile_name}` | `{LINKEDIN_RECIPIENTS}` |
 
 **⛔ STOP — If ANY service above is not configured, do NOT proceed past this point. Complete all phases of Step 0 first.**
 
@@ -180,29 +163,33 @@ Adapt the labels to the user's language (`請回覆數字...` for zh-TW, `Reply 
 
 > REQUIRES: Step 3 approved (user chose "Send")
 
-Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), first navigate with `playwright-headless` and verify the logged-in account matches the expected identity in `config.json` (by email, username, or account ID — not display name).** Sessions may carry a different account from previous use. If mismatched → log out first, `browser_close` headless (Rule 6), then re-login via `playwright-login`, close visible, re-check via headless.
+Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), first open the `weekly-report` session to the service and verify the logged-in account matches the expected identity in `config.json` (by email, username, or account ID — not display name).** Sessions may carry a different account from previous use. If mismatched → log out first, close `weekly-report` (Rule 6), then re-login via `weekly-report-login`, close visible, re-check via headless.
 
 **You MUST use the templates in `scripts/` for Email and LinkedIn — no inline reimplementation, no shortcut versions.** The templates encode quirks that cost real time to discover (Gmail's hidden-textarea body, LinkedIn's stacked bubbles, etc.); reimplementing in-line drops those and sends fail silently. Flow for each scripted channel:
 
-1. `Read` the template file verbatim
-2. `.replace()` each `__PLACEHOLDER__` with `JSON.stringify(value)` — do not inline-edit values another way
-3. Call `mcp__playwright-headless__browser_run_code` with the substituted code string
-4. **Verify the return value is exactly `{ sent: true }`.** Anything else (undefined, `{ sent: false }`, thrown error, empty result) = FAILED. Do not assume success from "no error" — the templates only return `sent: true` after explicit proof (Gmail "Message sent" toast, LinkedIn compose bubble dismiss, etc.).
+1. `Read` the template file verbatim.
+2. `.replace()` each `__PLACEHOLDER__` with `JSON.stringify(value)` — do not inline-edit values another way. (`JSON.stringify` handles quotes, unicode, and newlines safely; `playwright-cli run-code`'s JS context has no `process` or `require`, so args must be baked into the code via substitution.)
+3. `Write` the substituted code to `.pw-tmp/<template-name>.js`. The path **must** be under the skill's cwd — `playwright-cli run-code --filename` sandboxes `--filename` to cwd and its `.playwright-cli/` subdir; paths outside those roots are rejected with `File access denied`.
+4. Run:
+   ```bash
+   playwright-cli --raw -s=weekly-report run-code --filename=.pw-tmp/<template-name>.js
+   ```
+   `--raw` strips the default markdown-ish status output (`### Ran Playwright code` etc.) so stdout is exactly the JSON-serialized return value of the template — e.g. `{"sent":true}`.
+5. **Verify the stdout JSON is exactly `{"sent":true}`.** Anything else (missing key, `{"sent":false}`, non-zero exit, error JSON like `### Error\n...`) = FAILED. Do not assume success from "no error" — the templates only return `sent: true` after explicit proof (Gmail "Message sent" toast, LinkedIn compose bubble dismiss, etc.).
 
 On failure:
-1. Read the error message / partial return to diagnose
-2. If session expired or wrong account → `browser_close` headless → re-login via `playwright-login` → close visible → retry
-3. If element not found → retry once with updated selectors (patch the template in memory for this call, then update `scripts/` if the fix is real)
-4. If still failing → try Chrome DevTools MCP as fallback
-5. If all attempts fail → mark this channel FAILED in the summary with the specific reason; continue other channels
+1. Read the stderr / stdout to diagnose (non-`--raw` output includes a `### Error` block with the stack).
+2. If session expired or wrong account → `playwright-cli -s=weekly-report close` → re-login via `weekly-report-login` → close visible → retry.
+3. If element not found → retry once with updated selectors (patch the template in memory for this call, then update `scripts/` if the fix is real).
+4. If still failing after one retry → mark this channel FAILED in the summary with the specific reason; continue other channels. (No alternative browser tool — `@playwright/cli` is the only path.)
 
 | Channel | How |
 |---|---|
-| Email | If `email_platform` is `gmail`: for each recipient in `REPORT_RECIPIENTS`, follow the flow above with `scripts/gmail-send.js`, substituting `__TO__` (that single recipient), `__SUBJECT__`, `__BODY__`. One send per recipient — avoids the BCC-broadcast pattern Gmail flags as spam, and naturally hides recipients from each other. For non-gmail platforms only: navigate to `email_webmail_url` and adapt selectors dynamically. **Must be headless.** See [send-email.md](references/send-email.md). |
+| Email | If `email_platform` is `gmail`: for each recipient in `REPORT_RECIPIENTS`, follow the flow above with `scripts/gmail-send.js`, substituting `__TO__` (that single recipient), `__SUBJECT__`, `__BODY__`. One send per recipient — avoids the BCC-broadcast pattern Gmail flags as spam, and naturally hides recipients from each other. For non-gmail platforms only: build an inline `run-code` snippet that navigates to `email_webmail_url` and adapts selectors dynamically. **Headless session only.** See [send-email.md](references/send-email.md). |
 | LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'`. Success signal: HTTP 200 with empty `{}` body. Non-200 or error body = FAILED. |
-| LinkedIn | For each recipient: follow the flow above with `scripts/linkedin-dm.js`, substituting `__PROFILE_URL__` and `__MESSAGE__`. **Must be headless.** See [send-linkedin.md](references/send-linkedin.md). |
+| LinkedIn | For each recipient: follow the flow above with `scripts/linkedin-dm.js`, substituting `__PROFILE_URL__` and `__MESSAGE__`. **Headless session only.** See [send-linkedin.md](references/send-linkedin.md). |
 
-**After the loop, report every recipient explicitly** in a table (not prose): `channel | recipient | status (sent / FAILED) | evidence (the specific return value or error)`. **Do not claim `sent` without the concrete `{ sent: true }` or HTTP 200 in the evidence column** — anything vague means it didn't actually happen.
+**After the loop, report every recipient explicitly** in a table (not prose): `channel | recipient | status (sent / FAILED) | evidence (the specific return value or error)`. **Do not claim `sent` without the concrete `{"sent":true}` or HTTP 200 in the evidence column** — anything vague means it didn't actually happen.
 
 ## Step 5: Q&A Auto-Check
 
@@ -253,7 +240,7 @@ Then show a final one-liner (`QA scheduled every 15m (bypass mode, persistent). 
 
 **Step 5.3b — If `schedule` skill isn't available** (e.g. older Claude Desktop, skill disabled), fall back to a guided manual setup:
 
-- In a **new conversation**, type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local Playwright MCP access and this skill's folder).
+- In a **new conversation**, type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local `playwright-cli` + Bash access and this skill's folder).
 - **Interval** — `15m` (adjust to what the user asked for).
 - **Prompt** — one of `"qa"` / `"check replies"` / `"回覆"` (these hit the QA-cycle-only entry mode).
 - **Permission mode → `bypass`** — **mandatory.** In any other mode each tool call prompts for approval and the scheduled tick silently stalls.
@@ -261,24 +248,25 @@ Then show a final one-liner (`QA scheduled every 15m (bypass mode, persistent). 
 
 ### QA cycle (runs per scheduled tick)
 
-**QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST run the check scripts for both channels every cycle, then reply via the reply scripts. Scripts are mandatory (Rule 7); the reply templates return `{ sent: true }` only after the platform confirms delivery (Rule 8). Verify logged-in account before operating each channel (check by email/username/ID, not display name):
+**QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST run the check scripts for both channels every cycle, then reply via the reply scripts. Scripts are mandatory (Rule 7); the reply templates return `{"sent":true}` only after the platform confirms delivery (Rule 8). Verify logged-in account before operating each channel (check by email/username/ID, not display name):
+
+Each script goes through the same Read → substitute → Write to `.pw-tmp/` → `playwright-cli --raw -s=weekly-report run-code --filename=...` flow described in Step 4.
 
 - **Email (Gmail)**:
-  a. Run `scripts/gmail-qa-check.js` — substitute `__SUBJECT_FILTER__` (e.g. `"Weekly Report"`) and `__NEWER_THAN__` (e.g. `"1d"` for daily cadence, `"30m"` for 15-minute cadence with buffer). Returns `{ threads: [{ threadId, threadUrl, from, subject, bodyPreview }] }`.
-  b. For each thread that needs a response (use the report's raw data to ground the reply — never fabricate), run `scripts/gmail-qa-reply.js` with `__THREAD_URL__` from step a and the generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
-  c. Non-gmail platforms: fall back to adapting selectors on `email_webmail_url`.
+  a. Run `scripts/gmail-qa-check.js` — substitute `__SUBJECT_FILTER__` (e.g. `"Weekly Report"`) and `__NEWER_THAN__` (e.g. `"1d"` for daily cadence, `"30m"` for 15-minute cadence with buffer). Stdout JSON: `{"threads":[{"threadId","threadUrl","from","subject","bodyPreview"},...]}`.
+  b. For each thread that needs a response (use the report's raw data to ground the reply — never fabricate), run `scripts/gmail-qa-reply.js` with `__THREAD_URL__` from step a and the generated `__BODY__`. Verify stdout is exactly `{"sent":true}`.
+  c. Non-gmail platforms: fall back to an inline `run-code` snippet that adapts selectors on `email_webmail_url`.
 
 - **LINE OA**:
-  a. Run `scripts/line-qa-check.js` with `__ACCOUNT_ID__` from `config.json`. Returns `{ oaUserId, chats: [{ userName, lastMessage, timestamp, chatUrl }] }`.
-  b. For each chat whose `lastMessage` is newer than the previous tick's timestamp (persist the high-water mark in `config.json` across runs), run `scripts/line-qa-reply.js` with `__CHAT_URL__` and generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
+  a. Run `scripts/line-qa-check.js` with `__ACCOUNT_ID__` from `config.json`. Stdout: `{"oaUserId","chats":[{"userName","lastMessage","timestamp","chatUrl"},...]}`.
+  b. For each chat whose `lastMessage` is newer than the previous tick's timestamp (persist the high-water mark in `config.json` across runs), run `scripts/line-qa-reply.js` with `__CHAT_URL__` and generated `__BODY__`. Verify stdout is exactly `{"sent":true}`.
   c. **Mandatory — do NOT skip LINE even if Email had no replies.**
 
 ### Per-cycle housekeeping
 
-- If session expired or wrong account → `browser_close` headless (Rule 6) → switch to `playwright-login` for user to re-login → `browser_close` visible → resume headless. Under `bypass` permission mode there's nobody to click AskUserQuestion, so if a manual login is truly needed the cycle should exit with a clear log and let the next tick retry (the session often self-heals via silent SSO).
-- Fallback: Chrome DevTools MCP if Playwright fails.
+- If session expired or wrong account → `playwright-cli -s=weekly-report close` (Rule 6) → switch to `weekly-report-login` for the user to re-login → close visible → resume headless. Under `bypass` permission mode there's nobody to click AskUserQuestion, so if a manual login is truly needed the cycle should exit with a clear log and let the next tick retry (the session often self-heals via silent SSO).
 - Print summary of questions answered (even if zero) so the scheduled run log is useful.
-- **Always `browser_close` at the end of the cycle** (Rule 6 — releases the `--user-data-dir` lock for the next tick).
+- **Always close the session at the end of the cycle** (Rule 6 — releases the `.browser-session/` lock for the next tick): `playwright-cli -s=weekly-report close`.
 
 **Reply rules:** Every answer must trace to the report's raw data. Never fabricate.
 
@@ -290,12 +278,12 @@ Then show a final one-liner (`QA scheduled every 15m (bypass mode, persistent). 
 2. Never fabricate — raw data only.
 3. During init (Step 0), never ask for pure preferences — just do it. Use `AskUserQuestion` only when you need to block on user action: confirming an account identity after a session check, or the login handoff after opening a visible browser (`options: ["Done, I'm logged in", "Cancel"]`). For approval (Step 3), show a numbered plain-text menu — **not** `AskUserQuestion` — so its modal doesn't hide the draft. For Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
 4. ALL init must complete before ANY fetch.
-5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools. **Use `playwright-login` (visible) only when real user interaction is required — manual login, captcha solving, OA creation form review. Everything else (send email / LINE OA setup / LinkedIn DM / QA chat checks / session verification / Messaging API toggles / token retrieval) runs on `playwright-headless`.** If `playwright-headless` reports the user isn't logged in, hand off to `playwright-login` for that one login, then switch back.
-6. **`browser_close` before every mode switch — hard rule.** Both `playwright-login` and `playwright-headless` point at the same `--user-data-dir`; Chromium writes a lockfile (`SingletonLock` / `SingletonCookie` / `SingletonSocket`) there and crashes / corrupts the profile if two processes fight over it. Discipline:
-   - About to call a `playwright-login` tool → first call `mcp__playwright-headless__browser_close` (no-op if it wasn't running).
-   - About to call a `playwright-headless` tool → first call `mcp__playwright-login__browser_close`.
-   - Always `browser_close` the mode you just used before the step ends.
-   - **Recovery from a stale lockfile** (crash / interrupted run): `rm -f "<user-data-dir>/SingletonLock" "<user-data-dir>/SingletonCookie" "<user-data-dir>/SingletonSocket"`, then retry. The `--user-data-dir` path is the one configured in `claude_desktop_config.json`.
+5. **`@playwright/cli` is the only browser tool. No MCP browser tools. No Chrome DevTools. No `open` bash. No Claude-in-Chrome.** Use the `weekly-report-login` (headed) session only when real user interaction is required — manual login, captcha solving, OA creation form review. Everything else (send email / LINE OA setup / LinkedIn DM / QA chat checks / session verification / Messaging API toggles / token retrieval) runs on the `weekly-report` (headless) session. If the headless session reports the user isn't logged in, hand off to the headed session for that one login, then switch back.
+6. **`playwright-cli -s=<session> close` before every mode switch — hard rule.** Both sessions point at the same `--profile=.browser-session` directory; Chromium writes a lockfile (`SingletonLock` / `SingletonCookie` / `SingletonSocket`) there and crashes / corrupts the profile if two processes fight over it. Discipline:
+   - About to `open` the `weekly-report-login` session → first run `playwright-cli -s=weekly-report close` (no-op if it wasn't open).
+   - About to `open` the `weekly-report` session → first run `playwright-cli -s=weekly-report-login close`.
+   - Always close the session you just used before the step ends.
+   - **Recovery from a stale lockfile** (crash / interrupted run): `rm -f ".browser-session/SingletonLock" ".browser-session/SingletonCookie" ".browser-session/SingletonSocket"`, then retry. `playwright-cli kill-all` additionally force-terminates any zombie CLI daemons holding the lock — useful when `close` reports success but the next `open` still sees a stale lockfile.
 7. **Every template in `scripts/` is mandatory where it applies — no inline reimplementation.** The full inventory:
 
    | Script | Step | Use for |
@@ -309,7 +297,11 @@ Then show a final one-liner (`QA scheduled every 15m (bypass mode, persistent). 
    | `scripts/line-qa-check.js` | Step 5 | Listing LINE OA chats for reply candidates |
    | `scripts/line-qa-reply.js` | Step 5 | Replying to a LINE chat by URL |
 
-   Flow for each: `Read` the template file, substitute placeholders with `JSON.stringify(value)`, call `mcp__playwright-headless__browser_run_code`. Do not hand-write the compose / reply / form-fill flow — you will miss the quirks the templates encode (hidden textarea labeled "Message Body", compose-bubble stacking, bidi marks in Send label, Gmail's multi-dialog scoping, LINE's separate session SSO handshake, etc.) and the operation will fail silently. If a template is wrong for the current UI, patch it in `scripts/` and use the patched version — do not bypass.
+   Flow for each: `Read` the template, substitute placeholders with `JSON.stringify(value)`, `Write` to `.pw-tmp/<template-name>.js`, then:
+   ```bash
+   playwright-cli --raw -s=weekly-report run-code --filename=.pw-tmp/<template-name>.js
+   ```
+   Use `-s=weekly-report-login` instead only for `line-create-oa-fill.js`, where reCAPTCHA may throw a visible challenge the user needs to solve. Do not hand-write the compose / reply / form-fill flow — you will miss the quirks the templates encode (hidden textarea labeled "Message Body", compose-bubble stacking, bidi marks in Send label, Gmail's multi-dialog scoping, LINE's separate session SSO handshake, etc.) and the operation will fail silently. If a template is wrong for the current UI, patch it in `scripts/` and use the patched version — do not bypass.
 
-   Not scripted (intentional): login flows (inherently user-visible, covered by `playwright-login` + `AskUserQuestion`), LINE broadcast in Step 4 (plain `curl` to the Messaging API, no browser needed), and account-identity verification (a single `browser_navigate` + DOM read — too small to template).
-8. **Never claim `sent` without the explicit success signal.** The templates return `{ sent: true }` only after verifying the platform's own confirmation (Gmail "Message sent" toast, LinkedIn compose close, LINE API HTTP 200). If the return value isn't exactly `{ sent: true }` (or for LINE API: HTTP 200 with `{}` body), the send did **not** happen — report FAILED with the actual return / error. "No error was thrown" ≠ sent. The Step 4 final summary table must quote the concrete evidence (the return object or status code) per recipient.
+   Not scripted (intentional): login flows (inherently user-visible, covered by `weekly-report-login` + `AskUserQuestion`), LINE broadcast in Step 4 (plain `curl` to the Messaging API, no browser needed), and account-identity verification (a single inline `run-code` call — too small to template).
+8. **Never claim `sent` without the explicit success signal.** The templates return `{"sent":true}` only after verifying the platform's own confirmation (Gmail "Message sent" toast, LinkedIn compose close, LINE API HTTP 200). If the `--raw` stdout isn't exactly `{"sent":true}` (or for LINE API: HTTP 200 with `{}` body), the send did **not** happen — report FAILED with the actual return / error. "No error was thrown" ≠ sent. The Step 4 final summary table must quote the concrete evidence (the stdout JSON or status code) per recipient.

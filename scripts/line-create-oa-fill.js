@@ -1,5 +1,5 @@
 // Fill the LINE Official Account creation form.
-// Template for the Playwright MCP `browser_run_code` tool.
+// Template run via `playwright-cli run-code`.
 //
 // This template does NOT click the submit button — LINE's entry form is
 // gated by reCAPTCHA v3 (usually silent) plus server-side anti-automation.
@@ -7,18 +7,22 @@
 // occasionally triggers a visible challenge. After filling, either:
 //   • The skill clicks `button[type="submit"]` and waits for the URL to
 //     progress to `/confirmation` — then clicks 完成 on the review page.
-//   • If a reCAPTCHA challenge appears, hand control back to the user.
+//   • If a reCAPTCHA challenge appears, hand control back to the user
+//     (switch to the `weekly-report-login` headed session so they can see).
 //
 // Usage (from the skill):
-//   const tpl = fs.readFileSync('scripts/line-create-oa-fill.js', 'utf8');
-//   const code = tpl
-//     .replace('__ACCOUNT_NAME__',  JSON.stringify(accountName))   // ≤ 20 chars, displayed in users' chat list
-//     .replace('__EMAIL__',         JSON.stringify(email))
-//     .replace('__COMPANY_NAME__',  JSON.stringify(companyName))   // ≤ 100 chars
-//     .replace('__COUNTRY__',       JSON.stringify(country))       // e.g. '台灣'; pass null to keep default
-//     .replace('__INDUSTRY_MAIN__', JSON.stringify(industryMain))  // e.g. '網站＆部落格'
-//     .replace('__INDUSTRY_SUB__',  JSON.stringify(industrySub));  // label string, or null → pick first valid
-//   await mcp.browser_run_code({ code });
+//   1. Read this file, replace placeholders with JSON.stringify(value):
+//        __ACCOUNT_NAME__   ≤ 20 chars, displayed in users' chat list
+//        __EMAIL__
+//        __COMPANY_NAME__   ≤ 100 chars
+//        __COUNTRY__        e.g. '台灣'; pass null to keep default
+//        __INDUSTRY_MAIN__  e.g. '網站＆部落格'
+//        __INDUSTRY_SUB__   label string, or null → pick first valid
+//   2. Write the substituted code to `.pw-tmp/line-create-oa-fill.js`.
+//   3. Run (since reCAPTCHA may challenge visibly, this one uses the
+//      headed login session):
+//        playwright-cli --raw -s=weekly-report-login run-code \
+//          --filename=.pw-tmp/line-create-oa-fill.js
 //
 // Returns: { filled: true, industrySubSelected: <label> }
 

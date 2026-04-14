@@ -1,18 +1,20 @@
 // List LINE OA chats from the sidebar of `chat.line.biz`.
-// Template for the Playwright MCP `browser_run_code` tool.
+// Template run via `playwright-cli run-code`.
 //
-// Runs on `playwright-headless`. The MCP session must already be logged in
-// to LINE Business ID; `chat.line.biz` uses an OAuth session separate from
-// `manager.line.biz`, and will redirect to the login page on first visit.
-// The template clicks the `LINE account` SSO button to complete the
-// handshake silently against the existing Business ID cookies (same trick
-// as `scripts/line-init.js`).
+// Runs on the `weekly-report` (headless) session. The session must already
+// have LINE Business ID cookies in its --profile. `chat.line.biz` uses an
+// OAuth session separate from `manager.line.biz`, and will redirect to the
+// login page on first visit. The template clicks the `LINE account` SSO
+// button to complete the handshake silently against the existing Business
+// ID cookies (same trick as `scripts/line-init.js`).
 //
 // Usage (from the skill):
-//   const tpl = fs.readFileSync('scripts/line-qa-check.js', 'utf8');
-//   const code = tpl
-//     .replace('__ACCOUNT_ID__', JSON.stringify(accountId));  // e.g. '@909aheti'
-//   await mcp.browser_run_code({ code });
+//   1. Read this file, replace the placeholder with JSON.stringify(value):
+//        __ACCOUNT_ID__   e.g. '@909aheti'
+//   2. Write the substituted code to `.pw-tmp/line-qa-check.js`.
+//   3. Run:
+//        playwright-cli --raw -s=weekly-report run-code \
+//          --filename=.pw-tmp/line-qa-check.js
 //
 // Returns: {
 //   oaUserId,            // internal LINE user id of the OA (e.g. 'U08...') — used to build chat URLs

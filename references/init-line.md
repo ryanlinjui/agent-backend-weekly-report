@@ -1,8 +1,10 @@
 # Init: LINE
 
-**Use Playwright MCP only.** Do NOT use "Claude in Chrome", `open` bash, or search MCP registry.
+**Use `@playwright/cli` only.** Do NOT use "Claude in Chrome", `open` bash, Chrome DevTools MCP, or search MCP registry.
 
 **NEVER ask the user to provide the Channel Access Token. The agent must obtain it via browser automation from LINE Developers.**
+
+Run all commands from the skill's root folder so `--profile=.browser-session` is relative to cwd. Rule 6 applies: only one session open at a time — `close` before switching modes.
 
 Init has two modes. Ask the user up front which one:
 
@@ -11,23 +13,38 @@ Init has two modes. Ask the user up front which one:
 
 ## Phase 0 — LINE Business ID login
 
-LINE Business ID often **auto-completes SSO silently** when any LINE cookie is still present in the shared `--user-data-dir` (e.g. the user logged in to a different LINE property earlier, or the skill completed Phase 5 on a prior run). Always try the silent path first — visible browser and `AskUserQuestion` only come out when SSO can't resolve on its own.
+LINE Business ID often **auto-completes SSO silently** when any LINE cookie is still present in the shared `.browser-session/` profile (e.g. the user logged in to a different LINE property earlier, or the skill completed Phase 5 on a prior run). Always try the silent path first — the `weekly-report-login` headed session and `AskUserQuestion` only come out when SSO can't resolve on its own.
 
-1. **`browser_close` any active `playwright-headless` session first** (Rule 6 — shared `--user-data-dir` means simultaneous visible + headless clobbers the Chromium lockfile).
+1. **Close any active `weekly-report-login` session first** (Rule 6 — shared `.browser-session/` profile means simultaneous headed + headless clobbers the Chromium lockfile):
+   ```bash
+   playwright-cli -s=weekly-report-login close
+   ```
 
-2. **Try silent SSO in headless.** `playwright-headless` `browser_navigate` to `https://manager.line.biz`:
-   a. If the URL settles on `manager.line.biz/` or `manager.line.biz/account/...` → already logged in. Close headless and proceed to Phase 1.
-   b. If redirected to `account.line.biz/login` → click the `LINE account` button (the LINE-cookie SSO shortcut — same trick `scripts/line-init.js` Phase D and `scripts/line-qa-check.js` use). Wait up to 5 seconds.
-      - If the URL now settles on `manager.line.biz` → silent SSO worked. Close headless and proceed.
+2. **Try silent SSO in the headless `weekly-report` session.** Open `https://manager.line.biz`:
+   ```bash
+   playwright-cli -s=weekly-report open https://manager.line.biz --persistent --profile=.browser-session
+   ```
+   a. If the URL settles on `manager.line.biz/` or `manager.line.biz/account/...` → already logged in. Close `weekly-report` and proceed to Phase 1.
+   b. If redirected to `account.line.biz/login` → click the `LINE account` button via an inline `run-code` (the LINE-cookie SSO shortcut — same trick `scripts/line-init.js` Phase D and `scripts/line-qa-check.js` use). Wait up to 5 seconds.
+      - If the URL now settles on `manager.line.biz` → silent SSO worked. Close `weekly-report` and proceed.
       - If the login page stays (LINE wants QR / password) → fall through to step 3.
 
 3. **Manual login fallback** (only when step 2 didn't resolve):
-   a. `browser_close` the headless session.
-   b. Switch to `playwright-login` and `browser_navigate` to `https://manager.line.biz` (visible).
+   a. Close the `weekly-report` session:
+      ```bash
+      playwright-cli -s=weekly-report close
+      ```
+   b. Open the headed session at `https://manager.line.biz`:
+      ```bash
+      playwright-cli -s=weekly-report-login open https://manager.line.biz --headed --persistent --profile=.browser-session
+      ```
    c. Tell the user they need to sign in to LINE Business ID (this single login also authorizes `developers.line.biz` via SSO — see Phase 5). Block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`. Do NOT poll the page — the user may need to enter 2-step verification codes, wait on email verification, etc. Resume only on `Done`.
-   d. Snapshot the page to confirm we're on the OA Manager dashboard (not still on a login / 2FA screen). Then `browser_close` the visible browser.
+   d. Snapshot the page via a `run-code` call to confirm we're on the OA Manager dashboard (not still on a login / 2FA screen). Then close the visible browser:
+      ```bash
+      playwright-cli -s=weekly-report-login close
+      ```
 
-4. Proceed with `playwright-headless` for the remaining phases — unless Phase 1's entry form hits a reCAPTCHA challenge, in which case close headless first and run the form fill visibly so the user can solve it.
+4. Proceed with `weekly-report` (headless) for the remaining phases — unless Phase 1's entry form hits a reCAPTCHA challenge, in which case close headless first and run the form fill visibly on `weekly-report-login` so the user can solve it.
 
 ## Phase 1 — Create new OA (mode A only)
 
@@ -42,7 +59,20 @@ Navigate to `https://entry.line.biz/form/entry/unverified` and fill the form via
 | 業種大類 | `__INDUSTRY_MAIN__` | `select[name="category_group"]` |
 | 業種小類 | `__INDUSTRY_SUB__` (null = first valid) | `select[name="category"]` |
 
-The script fills fields and returns. **Submit is not scripted** — reCAPTCHA v3 runs invisibly on this form and can challenge unpredictably. Click `button[type="submit"]` after the template returns; if URL progresses to `/confirmation`, click the `完成` button on the review page to land on `/complete`. The new OA's `@accountId` is in the returned URL: `https://manager.line.biz/account/@<id>`.
+Because reCAPTCHA v3 runs invisibly on this form and can challenge unpredictably, run the fill against the **visible** `weekly-report-login` session:
+
+```bash
+playwright-cli --raw -s=weekly-report-login run-code --filename=.pw-tmp/line-create-oa-fill.js
+```
+
+The script fills fields and returns. **Submit is not scripted** — click `button[type="submit"]` after the template returns (inline `run-code` is fine); if URL progresses to `/confirmation`, click the `完成` button on the review page to land on `/complete`. The new OA's `@accountId` is in the returned URL: `https://manager.line.biz/account/@<id>`.
+
+Once the form flow is done, switch back to `weekly-report` for Phase 2+:
+
+```bash
+playwright-cli -s=weekly-report-login close
+playwright-cli -s=weekly-report open "https://manager.line.biz/account/@<id>" --persistent --profile=.browser-session
+```
 
 ## Phase 2 — Agree to post-creation TOS (mode A)
 
@@ -83,6 +113,13 @@ Phase D of `scripts/line-init.js`. Navigate to `https://developers.line.biz/cons
 
 The script extracts the token with `([A-Za-z0-9+/=]{100,})` from the slice after `Channel access token (long-lived)` — the only long base64-like run in that area.
 
+The whole run for Phases 2–5 invokes `scripts/line-init.js` via the usual substitution flow:
+
+```bash
+# After writing the substituted code to .pw-tmp/line-init.js:
+playwright-cli --raw -s=weekly-report run-code --filename=.pw-tmp/line-init.js
+```
+
 Save to `config.json`:
 
 ```json
@@ -99,7 +136,7 @@ Save to `config.json`:
 
 ## Session persists
 
-Subsequent runs reuse the Playwright session for QA chat monitoring via `https://chat.line.biz/account/<id>` (see Step 5). Sessions typically last weeks.
+Subsequent runs reuse the `.browser-session/` profile for QA chat monitoring via `https://chat.line.biz/account/<id>` (see Step 5). Sessions typically last weeks.
 
 ## Re-running
 

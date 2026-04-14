@@ -1,15 +1,18 @@
 // List unread Gmail threads that look like replies to a weekly report.
-// Template for the Playwright MCP `browser_run_code` tool.
+// Template run via `playwright-cli run-code`.
 //
-// Runs on `playwright-headless` (the MCP session must already be logged in
-// to Gmail via Step 0 Phase 3).
+// Runs on the `weekly-report` (headless) session — the session must already
+// be open with a --profile whose cookies include a logged-in Gmail (Step 0
+// Phase 3 handled that via `weekly-report-login`).
 //
 // Usage (from the skill):
-//   const tpl = fs.readFileSync('scripts/gmail-qa-check.js', 'utf8');
-//   const code = tpl
-//     .replace('__SUBJECT_FILTER__', JSON.stringify(subjectFilter))  // e.g. 'Weekly Report'
-//     .replace('__NEWER_THAN__',     JSON.stringify(newerThan));     // e.g. '1d', '30m', '2h'
-//   await mcp.browser_run_code({ code });
+//   1. Read this file, replace placeholders with JSON.stringify(value):
+//        __SUBJECT_FILTER__  e.g. 'Weekly Report'
+//        __NEWER_THAN__      e.g. '1d', '30m', '2h'
+//   2. Write the substituted code to `.pw-tmp/gmail-qa-check.js`.
+//   3. Run:
+//        playwright-cli --raw -s=weekly-report run-code \
+//          --filename=.pw-tmp/gmail-qa-check.js
 //
 // Returns: {
 //   threads: [{ threadId, threadUrl, from, subject, bodyPreview }, ...]

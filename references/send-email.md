@@ -1,22 +1,40 @@
 # Send: Email (Gmail)
 
-**Use `playwright-headless` MCP** — email sending must never pop a visible window (skill may run as a scheduled task). Login happens once via `playwright-login` in Step 0 Phase 3; the session is then reused by `playwright-headless` through the shared user-data directory configured for both MCPs.
+**Use the `weekly-report` (headless) `@playwright/cli` session** — email sending must never pop a visible window (the skill may run as a scheduled task under `permission: bypass`, with no user present to dismiss a window). Login happens once via the `weekly-report-login` headed session in Step 0 Phase 3; the cookies persist in the shared `.browser-session/` profile so the headless session reuses them.
 
 **One send per recipient.** The skill loops `REPORT_RECIPIENTS` and calls the template once per address. Each message has exactly one recipient in To — so nobody sees anyone else's address, and the send avoids the BCC-broadcast pattern that Gmail routinely flags as spam.
 
 ## Flow
 
-For each `toAddress` in `REPORT_RECIPIENTS`:
+First, make sure the `weekly-report` session is open at Gmail:
 
-1. Read the template file at `scripts/gmail-send.js`
+```bash
+playwright-cli -s=weekly-report-login close                         # Rule 6 — no visible session racing the profile lock
+playwright-cli -s=weekly-report open https://mail.google.com \
+  --persistent --profile=.browser-session                           # idempotent if already open
+```
+
+Then, for each `toAddress` in `REPORT_RECIPIENTS`:
+
+1. Read the template file at `scripts/gmail-send.js`.
 2. Substitute three placeholders via `JSON.stringify(...)` (handles quotes, unicode, and newlines safely):
    - `__TO__` — the single recipient address (string or `[addr]`)
    - `__SUBJECT__`, `__BODY__` — as usual
-3. Call `mcp__playwright-headless__browser_run_code` with the substituted code string as the `code` arg
-4. On `{ sent: true }` → move on to the next recipient
-5. On error → if the page redirected to a Google sign-in URL, re-run Step 0 Phase 3 Email login via `playwright-login`, then retry; otherwise report which recipient failed and continue with the rest
+3. Write the substituted code to `.pw-tmp/gmail-send.js` (must live under the project cwd — `run-code --filename` sandboxes to cwd).
+4. Run:
+   ```bash
+   playwright-cli --raw -s=weekly-report run-code --filename=.pw-tmp/gmail-send.js
+   ```
+5. On stdout `{"sent":true}` → move on to the next recipient.
+6. On error → if the page redirected to a Google sign-in URL, re-run Step 0 Phase 3 Email login via the `weekly-report-login` headed session, then retry this recipient; otherwise record which recipient failed and continue with the rest.
 
-Only after the loop finishes, report the aggregate result to the user.
+After the loop finishes, close the session (Rule 6):
+
+```bash
+playwright-cli -s=weekly-report close
+```
+
+Only then report the aggregate result to the user.
 
 ## Why one email per recipient (not BCC broadcast)
 
@@ -24,13 +42,13 @@ BCC broadcast was tested and reliably went to **Spam** in recipients' Gmail — 
 
 Each send has exactly one recipient, so privacy is preserved by construction — no recipient sees any other recipient's address.
 
-## Why `browser_run_code` (not turn-by-turn MCP calls)
+## Why `run-code` (not turn-by-turn CLI calls)
 
-The template runs as a single atomic JS function inside the browser — no LLM deliberation between clicks. Completes in ~5–10s per email instead of the minute-scale turn-by-turn flow.
+The template runs as a single atomic JS function inside the browser — no LLM deliberation between clicks. Completes in ~5–10s per email instead of the minute-scale turn-by-turn flow you'd get driving `click` / `fill` / `press` as separate CLI invocations.
 
 ## Scope
 
-Template is **Gmail-only**. The skill infers `email_platform` from the user's address (Step 0 Phase 2). When it's not `gmail`, the agent falls back to the generic flow: navigate to `email_webmail_url` with `playwright-headless` and adapt selectors on the fly to whatever webmail is loaded.
+Template is **Gmail-only**. The skill infers `email_platform` from the user's address (Step 0 Phase 2). When it's not `gmail`, the agent falls back to the generic flow: navigate to `email_webmail_url` on the `weekly-report` session and adapt selectors on the fly via an inline `run-code` snippet matched to whatever webmail is loaded.
 
 ## Quirks the template already handles
 
@@ -41,4 +59,4 @@ Template is **Gmail-only**. The skill infers `email_platform` from the user's ad
 
 ## Session expires?
 
-Re-run Step 0 Phase 3 Email login via `playwright-login`. Sessions typically last weeks.
+Re-run Step 0 Phase 3 Email login via the `weekly-report-login` headed session. Sessions typically last weeks.

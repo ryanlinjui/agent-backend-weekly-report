@@ -15,9 +15,9 @@
       "optional": false
     },
     {
-      "type": "mcp-server",
-      "name": "playwright",
-      "source": "npx -y @playwright/mcp",
+      "type": "cli-tool",
+      "name": "playwright-cli",
+      "source": "npm install -g @playwright/cli@latest",
       "optional": false
     },
     {
@@ -30,12 +30,6 @@
       "type": "mcp-server",
       "name": "notion",
       "source": "https://mcp.notion.com/mcp",
-      "optional": true
-    },
-    {
-      "type": "mcp-server",
-      "name": "chrome-devtools",
-      "source": "npx -y chrome-devtools-mcp",
       "optional": true
     }
   ],

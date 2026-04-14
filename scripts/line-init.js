@@ -1,9 +1,10 @@
-// LINE OA post-creation init — template for Playwright MCP `browser_run_code`.
+// LINE OA post-creation init — template run via `playwright-cli run-code`.
 //
 // Prerequisites: the OA already exists (either just created via the unverified
 // entry form, or an existing OA the user has chosen to reuse). The browser
 // session must be logged in to LINE Business ID (handled in Step 0 Phase 3
-// via `playwright-login`).
+// via the `weekly-report-login` headed session; this template then runs in
+// the `weekly-report` headless session sharing the same --profile).
 //
 // This template runs the deterministic, scriptable portion of LINE init:
 //   Phase A — Click through any pending TOS / notices.
@@ -17,16 +18,18 @@
 //   • The account-creation form at entry.line.biz — see
 //     `scripts/line-create-oa-fill.js`. reCAPTCHA + email signals there make
 //     end-to-end automation unreliable, so the skill fills + the user submits.
-//   • The initial LINE Business ID login — always user-driven via
-//     `playwright-login`.
+//   • The initial LINE Business ID login — always user-driven via the
+//     `weekly-report-login` headed session.
 //
 // Usage (from the skill):
-//   const tpl = fs.readFileSync('scripts/line-init.js', 'utf8');
-//   const code = tpl
-//     .replace('__ACCOUNT_ID__',        JSON.stringify(accountId))        // e.g. '@396tyvhm'
-//     .replace('__PROVIDER_NAME__',     JSON.stringify(providerName))     // existing provider label, or null
-//     .replace('__NEW_PROVIDER_NAME__', JSON.stringify(newProviderName)); // used only when providerName is null
-//   await mcp.browser_run_code({ code });
+//   1. Read this file, replace placeholders with JSON.stringify(value):
+//        __ACCOUNT_ID__          e.g. '@396tyvhm'
+//        __PROVIDER_NAME__       existing provider label, or null
+//        __NEW_PROVIDER_NAME__   used only when providerName is null
+//   2. Write the substituted code to `.pw-tmp/line-init.js`.
+//   3. Run:
+//        playwright-cli --raw -s=weekly-report run-code \
+//          --filename=.pw-tmp/line-init.js
 //
 // Returns: {
 //   accountId, channelId, channelSecret, channelAccessToken,

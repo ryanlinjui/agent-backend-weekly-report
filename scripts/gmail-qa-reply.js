@@ -1,16 +1,18 @@
 // Reply inline to a specific Gmail thread.
-// Template for the Playwright MCP `browser_run_code` tool.
+// Template run via `playwright-cli run-code`.
 //
-// Runs on `playwright-headless`. The MCP session must already be logged in
-// to Gmail. Prefer driving this from `threadUrl` returned by
-// `scripts/gmail-qa-check.js` — it's more stable than re-searching.
+// Runs on the `weekly-report` (headless) session. The session must already
+// have Gmail cookies in its --profile. Prefer driving this from `threadUrl`
+// returned by `scripts/gmail-qa-check.js` — it's more stable than re-searching.
 //
 // Usage (from the skill):
-//   const tpl = fs.readFileSync('scripts/gmail-qa-reply.js', 'utf8');
-//   const code = tpl
-//     .replace('__THREAD_URL__', JSON.stringify(threadUrl))  // from gmail-qa-check
-//     .replace('__BODY__',       JSON.stringify(replyBody)); // the reply text
-//   await mcp.browser_run_code({ code });
+//   1. Read this file, replace placeholders with JSON.stringify(value):
+//        __THREAD_URL__   from gmail-qa-check
+//        __BODY__         the reply text
+//   2. Write the substituted code to `.pw-tmp/gmail-qa-reply.js`.
+//   3. Run:
+//        playwright-cli --raw -s=weekly-report run-code \
+//          --filename=.pw-tmp/gmail-qa-reply.js
 //
 // Returns: { sent: true } on success; throws on failure. Rule 8 applies —
 // the caller MUST verify the return is exactly { sent: true }.

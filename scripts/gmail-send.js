@@ -1,19 +1,18 @@
-// Send a Gmail email — template for the Playwright MCP `browser_run_code` tool.
+// Send a Gmail email — template run via `playwright-cli run-code`.
 //
 // How the skill uses this file:
 //   1. Read this file, replace __TO__, __SUBJECT__, __BODY__ with JSON-encoded
 //      string literals (use JSON.stringify to escape quotes/unicode/newlines).
-//   2. Call mcp__playwright-headless__browser_run_code with the resulting code.
-//   3. The MCP session must already be logged into Gmail
-//      (handled by Step 0 Phase 3 of the skill via playwright-login).
-//
-// Usage example (from the skill):
-//   const tpl = fs.readFileSync('scripts/gmail-send.js', 'utf8');
-//   const code = tpl
-//     .replace('__TO__',      JSON.stringify(toAddr))
-//     .replace('__SUBJECT__', JSON.stringify(subject))
-//     .replace('__BODY__',    JSON.stringify(body));
-//   await mcp.browser_run_code({ code });
+//   2. Write the substituted code to `.pw-tmp/gmail-send.js` (must live under
+//      the project cwd — `run-code --filename` sandboxes to the current
+//      working directory).
+//   3. Run:
+//        playwright-cli --raw -s=weekly-report run-code \
+//          --filename=.pw-tmp/gmail-send.js
+//      Stdout is the return value as JSON. Verify it is `{ "sent": true }`.
+//   4. The `weekly-report` session must already be open and logged in to
+//      Gmail (handled by Step 0 Phase 3 of the skill via the
+//      `weekly-report-login` headed session sharing the same --profile).
 //
 // `to` accepts a string (single address or comma-separated list) or an array
 // — all normalize to individual recipient chips. For privacy-sensitive
