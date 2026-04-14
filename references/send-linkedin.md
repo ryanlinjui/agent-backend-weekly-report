@@ -8,7 +8,7 @@ For each `profileUrl` in `LINKEDIN_RECIPIENTS`:
 1. Read the template file at `scripts/linkedin-dm.js`
 2. Replace `__PROFILE_URL__` with `JSON.stringify(profileUrl)` and `__MESSAGE__` with `JSON.stringify(message)` — `JSON.stringify` handles escaping for quotes, unicode, and newlines safely
 3. Call `mcp__playwright-login__browser_run_code` with the substituted code string as the `code` arg
-4. On `{ sent: true }` → take a screenshot as proof, show to user
+4. On `{ sent: true }` → report success to user
 5. On error → if the page redirected to `/login` or `/authwall`, re-run Step 0 Phase 3 LinkedIn login via `playwright-login`, then retry
 
 ## Why `browser_run_code` (not turn-by-turn MCP calls)

@@ -7,25 +7,15 @@ description: Generate and send a weekly report from GitHub, Slack, and Notion. D
 
 Auto-detect user language from OS locale or their message. Use that language for all output.
 
-## Pre-flight
-
-**Skip this step if running from `/loop` (scheduled/recurring execution).** Only applies to interactive (user-initiated) runs.
-
-Before doing anything else, output a message asking the user if they're ready to start (e.g. "Ready to start? Type anything to continue."). Do NOT use `AskUserQuestion` — the user must reply in the chat input box to trigger a second conversation iteration. This ensures MCP tools (Playwright, Slack, Notion, etc.) are fully loaded before any work begins.
-
-**Do NOT call any tool or run any command until the user replies.**
-
 ## Step 0: Init
 
 **All state lives in this skill's root folder** (e.g. `config.json` plus any browser session data the agent chooses to persist). Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
 
-**Playwright, Slack, Notion MCP tools are pre-configured via manifest. NEVER check if they're installed. NEVER try to install them. NEVER call any MCP tool until Step 1. Just trust they exist and use them when needed.**
+**Playwright, Slack, Notion MCP tools are pre-configured via manifest. NEVER check if they're installed. NEVER try to install them. Trust they exist and use them when needed.**
 
 First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init).
 
-### Phase 1: Check GitHub ONLY
-
-**ONLY run `gh auth status`. Do NOT call ANY MCP tool (Playwright, Slack, Notion, or anything else). MCP tools are pre-installed — calling them too early causes false "unavailable" errors.**
+### Phase 1: Check GitHub
 
 | Service | How to check | If not ready |
 |---|---|---|
@@ -113,16 +103,14 @@ Each channel independent. **Before operating on any browser-based channel (Email
 On failure:
 1. Read the error message to diagnose the cause
 2. If session expired or wrong account → re-login via `playwright-login`, then retry
-3. If element not found → take screenshot, retry once with updated selectors
+3. If element not found → retry once with updated selectors
 4. If still failing → try Chrome DevTools MCP as fallback
 5. If all attempts fail → report what failed and why in plain language, continue other channels
 
-**After each successful send, take a screenshot as proof and show it to the user.**
-
 | Channel | How |
 |---|---|
-| Email | Read `email_platform` and `email_webmail_url` from `config.json` → Playwright headless → navigate to the saved webmail URL → Compose → fill To / Subject / Body → Send → screenshot sent confirmation. Agent must adapt its selectors and compose flow to the actual platform. |
-| LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'` (token from `config.json`) → then Playwright headless open LINE OA Manager chat to screenshot the sent message |
+| Email | Read `email_platform` and `email_webmail_url` from `config.json` → Playwright headless → navigate to the saved webmail URL → Compose → fill To / Subject / Body → Send. Agent must adapt its selectors and compose flow to the actual platform. |
+| LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'` (token from `config.json`) — broadcast reaches all followers. |
 | LinkedIn | For each recipient: read the template at `scripts/linkedin-dm.js`, substitute `__PROFILE_URL__` and `__MESSAGE__` via `JSON.stringify`, then call `mcp__playwright-login__browser_run_code` with the result. LinkedIn session lives in `playwright-login` (not `playwright-headless` — separate contexts). See [send-linkedin.md](references/send-linkedin.md). |
 
 ## Step 5: Q&A Auto-Check
@@ -135,13 +123,12 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 
 1. Use `/loop 15m` to schedule recurring checks
 2. **You MUST check ALL channels every cycle. Do NOT skip any channel.** Verify logged-in account before operating each channel (check by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
-   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → compose and send response → screenshot. Agent adapts to the actual platform.
-   - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → go to Chat tab → check for new messages → reply directly in chat → screenshot. **This is mandatory — do NOT skip LINE even if Email had no replies.**
+   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → compose and send response. Agent adapts to the actual platform.
+   - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → go to Chat tab → check for new messages → reply directly in chat. **This is mandatory — do NOT skip LINE even if Email had no replies.**
 3. If session expired or wrong account, switch to `playwright-login` for user to re-login, then back to headless
 4. Fallback: Chrome DevTools MCP if Playwright fails
-5. Show all screenshots as proof
-6. Print summary of questions answered
-7. **Always call `browser_close` after each check cycle**
+5. Print summary of questions answered
+6. **Always call `browser_close` after each check cycle**
 
 **Reply rules:** Every answer must trace to the report's raw data. Never fabricate.
 

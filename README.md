@@ -17,7 +17,7 @@ These are declared in `manifest.json` and must be connected in Claude Desktop:
 
 | MCP Server | Source | Purpose |
 |---|---|---|
-| Playwright | `npx @playwright/mcp@latest` | Browser automation (send email, LinkedIn DM, LINE OA screenshots) |
+| Playwright | `npx @playwright/mcp@latest` | Browser automation (send email, LinkedIn DM, LINE OA Manager access) |
 | Slack | `https://mcp.slack.com/mcp` | Fetch Slack messages as report data source |
 | Notion | `https://mcp.notion.com/mcp` | Fetch Notion pages as report data source |
 | Chrome DevTools | `npx chrome-devtools-mcp@latest` | Fallback browser automation if Playwright fails |
