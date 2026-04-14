@@ -7,6 +7,17 @@ description: Generate and send a weekly report from GitHub, Slack, and Notion. D
 
 Auto-detect user language from OS locale or their message. Use that language for all output.
 
+## Entry modes
+
+Decide which mode based on the user's activation phrase (case- and language-insensitive match against `description` triggers):
+
+| Phrase (examples) | Mode | What to run |
+|---|---|---|
+| `weekly report`, `週報`, `generate report` | **Full report** | Step 0 → Step 1 → Step 2 → Step 3 → Step 4 → Step 5 (setup offer) |
+| `qa`, `check replies`, `回覆` | **QA cycle only** | Step 0 Phase 0 (MCP verify) → Step 5 `QA cycle` section only. **Skip Steps 1–4** — this entry is for scheduled ticks and ad-hoc reply sweeps, not for producing a new report. |
+
+Scheduled `/schedule` tasks always invoke the **QA cycle only** mode (their prompt is one of `qa` / `check replies`). Full-report triggers are expected to be rare (once a week, user-initiated).
+
 ## Step 0: Init
 
 **All state lives in this skill's root folder** (e.g. `config.json` plus any browser session data the agent chooses to persist). Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
@@ -197,20 +208,26 @@ On failure:
 
 > REQUIRES: Step 4 completed (at least one channel sent successfully)
 
-After sending, offer the user a scheduled QA loop via **Claude Desktop's built-in `/schedule` (local task)** — the skill is used as a scheduled task so it can keep replying even when the user isn't at the computer. `/loop` works for an interactive ad-hoc check, but scheduled automation must go through `/schedule`.
+After sending, **offer** the user a scheduled QA loop via **Claude Desktop's built-in `/schedule` (local task)** — the skill is used as a scheduled task so it can keep replying even when the user isn't at the computer. `/loop` works for an interactive ad-hoc check, but scheduled automation must go through `/schedule`.
 
-### Scheduling the QA task
+### Scheduling the QA task (first-run only — idempotent)
 
-Guide the user through creating the task **themselves** (the skill can't create schedule entries programmatically):
+**Check `config.json` for `qa_schedule_configured: true` first.** If the flag is set, skip this whole section — the user already has a `/schedule` task running; re-prompting would produce a duplicate task that wastes quota. Instead, print a one-line status (e.g. `QA already scheduled (every 15m via /schedule). Use /schedule to change or delete.`) and end.
 
-1. In any conversation, type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local access to Playwright MCP and this skill's folder).
-2. Fill in:
-   - **Interval** — `15m` (or whatever cadence the user wants).
-   - **Prompt** — something that triggers this skill, e.g. `"qa"` or `"check weekly-report replies"`. The skill's `description` frontmatter already lists these as activation phrases.
-   - **Permission mode → `bypass`** — **this is mandatory, not optional.** In any other mode Claude will prompt for approval on each tool call (browser navigation, `browser_run_code`, etc.), and scheduled runs have nobody there to click Approve. The whole task silently stalls. Explicitly tell the user to pick `bypass` and why.
-3. Confirm the task is saved (it appears in `/schedule`'s task list).
+If the flag is **not** set:
 
-After setup, each scheduled wake-up lands back in this skill with the QA activation phrase. Treat it as a one-shot QA cycle and follow the flow below — no internal `/loop` needed.
+1. Confirm via `AskUserQuestion` — `options: ["Yes, set up QA schedule", "Skip"]`. If Skip → write `qa_schedule_configured: false` to `config.json` and finish (still skip on next run unless the user re-invokes the skill and flips it).
+2. Guide the user through creating the task **themselves** (Claude Desktop's `/schedule` panel can't be driven programmatically):
+   - In any conversation (not this one — start a new chat), type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local access to Playwright MCP and this skill's folder).
+   - **Interval** — `15m` (or whatever cadence the user wants — offer 5m / 15m / 30m / 1h).
+   - **Prompt** — one of `"qa"` / `"check replies"` / `"回覆"`. These hit the skill's **QA cycle only** entry mode so each tick skips Steps 1–4.
+   - **Permission mode → `bypass`** — **mandatory, not optional.** In any other mode Claude will prompt for approval on each tool call (browser navigation, `browser_run_code`, etc.), and scheduled runs have nobody there to click Approve — the whole task silently stalls. Explicitly tell the user to pick `bypass` and why.
+3. Ask `AskUserQuestion` — `options: ["Done, task created", "Cancel"]`. Only mark the flag as configured after the user confirms `Done`.
+4. Write to `config.json`:
+   ```json
+   { "qa_schedule_configured": true, "qa_schedule_interval": "15m" }
+   ```
+   (Preserve all other keys.) On subsequent `/weekly-report` full-report runs, Step 5 will see this flag and skip re-prompting.
 
 ### QA cycle (runs per scheduled tick)
 
