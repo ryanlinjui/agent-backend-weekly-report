@@ -97,7 +97,7 @@ For each service, navigate with `playwright-headless` first. A previous session 
 **For each service:**
 1. Open the URL with `playwright-headless`
 2. If already logged in → read the account identifier (email, username, account ID — **NEVER rely on display name alone**) → show to user via `AskUserQuestion` with `options: ["Yes, it's mine", "No, wrong account"]`
-3. If wrong account or not logged in → **log out first if needed** → switch to `playwright-login` (visible browser) → tell user which site to log in to → **block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`** (do NOT poll the page; the user needs time to complete the flow, and an AskUserQuestion is the clean handoff). After `Done`, re-read the logged-in account identifier to verify it matches expectation, then close the visible browser.
+3. If wrong account or not logged in → **log out first if needed** → **`browser_close` the headless session** (Rule 6: required before switching mode) → switch to `playwright-login` (visible browser) → tell user which site to log in to → **block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`** (do NOT poll the page; the user needs time to complete the flow, and an AskUserQuestion is the clean handoff). After `Done`, re-read the logged-in account identifier to verify it matches expectation, then **`browser_close` the visible browser** before any subsequent headless operation.
 4. Save verified identity to `config.json`
 
 | Service | URL | Verify by | Done when |
@@ -169,7 +169,7 @@ Adapt the labels to the user's language (`請回覆數字...` for zh-TW, `Reply 
 
 > REQUIRES: Step 3 approved (user chose "Send")
 
-Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), first navigate with `playwright-headless` and verify the logged-in account matches the expected identity in `config.json` (by email, username, or account ID — not display name).** Sessions may carry a different account from previous use. If mismatched → log out first, then re-login via `playwright-login`.
+Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), first navigate with `playwright-headless` and verify the logged-in account matches the expected identity in `config.json` (by email, username, or account ID — not display name).** Sessions may carry a different account from previous use. If mismatched → log out first, `browser_close` headless (Rule 6), then re-login via `playwright-login`, close visible, re-check via headless.
 
 On failure:
 1. Read the error message to diagnose the cause
@@ -196,7 +196,7 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 2. **QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST check both Email and LINE every cycle. Do NOT skip either. Verify logged-in account before operating each channel (check by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
    - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → compose and send response. Agent adapts to the actual platform.
    - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → go to Chat tab → check for new messages → reply directly in chat. **This is mandatory — do NOT skip LINE even if Email had no replies.**
-3. If session expired or wrong account, switch to `playwright-login` for user to re-login, then back to headless
+3. If session expired or wrong account → `browser_close` headless (Rule 6) → switch to `playwright-login` for user to re-login → `browser_close` visible → resume headless
 4. Fallback: Chrome DevTools MCP if Playwright fails
 5. Print summary of questions answered
 6. **Always call `browser_close` after each check cycle**
@@ -212,4 +212,8 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 3. During init (Step 0), never ask for pure preferences — just do it. Use `AskUserQuestion` only when you need to block on user action: confirming an account identity after a session check, or the login handoff after opening a visible browser (`options: ["Done, I'm logged in", "Cancel"]`). For approval (Step 3), show a numbered plain-text menu — **not** `AskUserQuestion` — so its modal doesn't hide the draft. For Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
 4. ALL init must complete before ANY fetch.
 5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools. **Use `playwright-login` (visible) only when real user interaction is required — manual login, captcha solving, OA creation form review. Everything else (send email / LINE OA setup / LinkedIn DM / QA chat checks / session verification / Messaging API toggles / token retrieval) runs on `playwright-headless`.** If `playwright-headless` reports the user isn't logged in, hand off to `playwright-login` for that one login, then switch back.
-6. **Always call `browser_close` when done.** Playwright only allows one session at a time — if not closed, other skills cannot use the browser.
+6. **`browser_close` before every mode switch — hard rule.** Both `playwright-login` and `playwright-headless` point at the same `--user-data-dir`; Chromium writes a lockfile (`SingletonLock` / `SingletonCookie` / `SingletonSocket`) there and crashes / corrupts the profile if two processes fight over it. Discipline:
+   - About to call a `playwright-login` tool → first call `mcp__playwright-headless__browser_close` (no-op if it wasn't running).
+   - About to call a `playwright-headless` tool → first call `mcp__playwright-login__browser_close`.
+   - Always `browser_close` the mode you just used before the step ends.
+   - **Recovery from a stale lockfile** (crash / interrupted run): `rm -f "<user-data-dir>/SingletonLock" "<user-data-dir>/SingletonCookie" "<user-data-dir>/SingletonSocket"`, then retry. The `--user-data-dir` path is the one configured in `claude_desktop_config.json`.

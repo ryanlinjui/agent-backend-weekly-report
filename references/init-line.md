@@ -11,11 +11,12 @@ Init has two modes. Ask the user up front which one:
 
 ## Phase 0 — LINE Business ID login (visible browser, user operates)
 
-1. Call `playwright-login` `browser_navigate` to `https://manager.line.biz`
-2. Tell the user they need to sign in to LINE Business ID (this single login also authorizes `developers.line.biz` via SSO — see Phase 5). Then block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`. Do NOT poll the page — the user may need to enter 2-step verification codes, wait on email verification, etc. Resume only on `Done`.
-3. After `Done`: snapshot the page to confirm we're on the OA Manager dashboard (not still on a login / 2FA screen). Then close the visible browser.
+1. **`browser_close` any active `playwright-headless` session first** (Rule 6 — shared `--user-data-dir` means simultaneous visible + headless clobbers the Chromium lockfile).
+2. Call `playwright-login` `browser_navigate` to `https://manager.line.biz`
+3. Tell the user they need to sign in to LINE Business ID (this single login also authorizes `developers.line.biz` via SSO — see Phase 5). Then block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`. Do NOT poll the page — the user may need to enter 2-step verification codes, wait on email verification, etc. Resume only on `Done`.
+4. After `Done`: snapshot the page to confirm we're on the OA Manager dashboard (not still on a login / 2FA screen). **Then `browser_close` the visible browser** before switching to headless.
 
-Switch to `playwright-headless` for the remaining phases — unless step 2 of Phase 1 hits the reCAPTCHA challenge, in which case it must run visibly so the user can solve it.
+Switch to `playwright-headless` for the remaining phases — unless step 2 of Phase 1 hits the reCAPTCHA challenge, in which case close headless first and run the form fill visibly so the user can solve it.
 
 ## Phase 1 — Create new OA (mode A only)
 
