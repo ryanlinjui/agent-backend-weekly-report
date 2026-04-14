@@ -171,18 +171,27 @@ Adapt the labels to the user's language (`請回覆數字...` for zh-TW, `Reply 
 
 Each channel independent. **Before operating on any browser-based channel (Email, LINE, LinkedIn), first navigate with `playwright-headless` and verify the logged-in account matches the expected identity in `config.json` (by email, username, or account ID — not display name).** Sessions may carry a different account from previous use. If mismatched → log out first, `browser_close` headless (Rule 6), then re-login via `playwright-login`, close visible, re-check via headless.
 
+**You MUST use the templates in `scripts/` for Email and LinkedIn — no inline reimplementation, no shortcut versions.** The templates encode quirks that cost real time to discover (Gmail's hidden-textarea body, LinkedIn's stacked bubbles, etc.); reimplementing in-line drops those and sends fail silently. Flow for each scripted channel:
+
+1. `Read` the template file verbatim
+2. `.replace()` each `__PLACEHOLDER__` with `JSON.stringify(value)` — do not inline-edit values another way
+3. Call `mcp__playwright-headless__browser_run_code` with the substituted code string
+4. **Verify the return value is exactly `{ sent: true }`.** Anything else (undefined, `{ sent: false }`, thrown error, empty result) = FAILED. Do not assume success from "no error" — the templates only return `sent: true` after explicit proof (Gmail "Message sent" toast, LinkedIn compose bubble dismiss, etc.).
+
 On failure:
-1. Read the error message to diagnose the cause
-2. If session expired or wrong account → re-login via `playwright-login`, then retry
-3. If element not found → retry once with updated selectors
+1. Read the error message / partial return to diagnose
+2. If session expired or wrong account → `browser_close` headless → re-login via `playwright-login` → close visible → retry
+3. If element not found → retry once with updated selectors (patch the template in memory for this call, then update `scripts/` if the fix is real)
 4. If still failing → try Chrome DevTools MCP as fallback
-5. If all attempts fail → report what failed and why in plain language, continue other channels
+5. If all attempts fail → mark this channel FAILED in the summary with the specific reason; continue other channels
 
 | Channel | How |
 |---|---|
-| Email | If `email_platform` is `gmail`: for each recipient in `REPORT_RECIPIENTS`, read the template at `scripts/gmail-send.js`, substitute `__TO__` with that single recipient, `__SUBJECT__`, `__BODY__` via `JSON.stringify`, then call `mcp__playwright-headless__browser_run_code`. One send per recipient — avoids the BCC-broadcast pattern that Gmail flags as spam, and naturally hides recipients from each other. For other platforms: navigate to `email_webmail_url` with Playwright headless and adapt selectors/flow dynamically. **Must be headless** — skill may run as a scheduled task. See [send-email.md](references/send-email.md). |
-| LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'` (token from `config.json`) — broadcast reaches all followers. |
-| LinkedIn | For each recipient: read the template at `scripts/linkedin-dm.js`, substitute `__PROFILE_URL__` and `__MESSAGE__` via `JSON.stringify`, then call `mcp__playwright-headless__browser_run_code` with the result. **Must be headless** — skill may run as a scheduled task. See [send-linkedin.md](references/send-linkedin.md). |
+| Email | If `email_platform` is `gmail`: for each recipient in `REPORT_RECIPIENTS`, follow the flow above with `scripts/gmail-send.js`, substituting `__TO__` (that single recipient), `__SUBJECT__`, `__BODY__`. One send per recipient — avoids the BCC-broadcast pattern Gmail flags as spam, and naturally hides recipients from each other. For non-gmail platforms only: navigate to `email_webmail_url` and adapt selectors dynamically. **Must be headless.** See [send-email.md](references/send-email.md). |
+| LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'`. Success signal: HTTP 200 with empty `{}` body. Non-200 or error body = FAILED. |
+| LinkedIn | For each recipient: follow the flow above with `scripts/linkedin-dm.js`, substituting `__PROFILE_URL__` and `__MESSAGE__`. **Must be headless.** See [send-linkedin.md](references/send-linkedin.md). |
+
+**After the loop, report every recipient explicitly** in a table (not prose): `channel | recipient | status (sent / FAILED) | evidence (the specific return value or error)`. **Do not claim `sent` without the concrete `{ sent: true }` or HTTP 200 in the evidence column** — anything vague means it didn't actually happen.
 
 ## Step 5: Q&A Auto-Check
 
@@ -217,3 +226,5 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
    - About to call a `playwright-headless` tool → first call `mcp__playwright-login__browser_close`.
    - Always `browser_close` the mode you just used before the step ends.
    - **Recovery from a stale lockfile** (crash / interrupted run): `rm -f "<user-data-dir>/SingletonLock" "<user-data-dir>/SingletonCookie" "<user-data-dir>/SingletonSocket"`, then retry. The `--user-data-dir` path is the one configured in `claude_desktop_config.json`.
+7. **Send templates in `scripts/` are mandatory — no inline reimplementation.** For Email (Gmail), LinkedIn DM, and LINE OA init: `Read` the template file, substitute placeholders with `JSON.stringify(value)`, call `mcp__playwright-headless__browser_run_code`. Do not hand-write the compose flow in the current turn — you will miss the quirks the template encodes (hidden textarea labeled "Message Body", compose-bubble stacking, bidi marks in Send label, etc.) and the send will fail silently.
+8. **Never claim `sent` without the explicit success signal.** The templates return `{ sent: true }` only after verifying the platform's own confirmation (Gmail "Message sent" toast, LinkedIn compose close, LINE API HTTP 200). If the return value isn't exactly `{ sent: true }` (or for LINE API: HTTP 200 with `{}` body), the send did **not** happen — report FAILED with the actual return / error. "No error was thrown" ≠ sent. The Step 4 final summary table must quote the concrete evidence (the return object or status code) per recipient.
