@@ -9,28 +9,34 @@
       "optional": false
     },
     {
+      "type": "cli-tool",
+      "name": "node",
+      "source": "https://nodejs.org",
+      "optional": false
+    },
+    {
       "type": "mcp-server",
       "name": "playwright",
-      "source": "npx @playwright/mcp@latest",
+      "source": "npx -y @playwright/mcp",
       "optional": false
     },
     {
       "type": "mcp-server",
       "name": "slack",
       "source": "https://mcp.slack.com/mcp",
-      "optional": false
+      "optional": true
     },
     {
       "type": "mcp-server",
       "name": "notion",
       "source": "https://mcp.notion.com/mcp",
-      "optional": false
+      "optional": true
     },
     {
       "type": "mcp-server",
       "name": "chrome-devtools",
-      "source": "npx chrome-devtools-mcp@latest",
-      "optional": false
+      "source": "npx -y chrome-devtools-mcp",
+      "optional": true
     }
   ],
   "firstRunMessage": {

@@ -11,9 +11,65 @@ Auto-detect user language from OS locale or their message. Use that language for
 
 **All state lives in this skill's root folder** (e.g. `config.json` plus any browser session data the agent chooses to persist). Never write to global/user-level paths. This enables scheduled tasks — the agent resolves its own folder from this SKILL.md's path.
 
-**Playwright, Slack, Notion MCP tools are pre-configured via manifest. NEVER check if they're installed. NEVER try to install them. Trust they exist and use them when needed.**
+**Required:** `gh`, `npx`, and the Playwright MCP. Slack / Notion / Chrome DevTools MCPs are optional — skip data sources whose MCP isn't connected, and fall back to Chrome DevTools only if it's available. Phase 0 verifies the required set every run; a silent Playwright misconfig in Claude Desktop cascades into downstream failures, so it's worth checking up front.
 
 First, read `config.json` (same folder as this SKILL.md) to check which services are already configured (skip their init).
+
+### Phase 0: Verify CLI + Playwright MCP config (every run)
+
+Run this check up front — a missing CLI or a misconfigured `claude_desktop_config.json` causes silent failures later (tool calls hang or time out with no useful error).
+
+**Step 0a — CLI tools.** For each, run the check command; if it fails, tell the user the exact install command for **their OS** (detect via `uname -s` / `$OSTYPE` / `%OS%`), then STOP until they confirm.
+
+| Tool | Check | Install (macOS) | Install (Windows) | Install (Linux) |
+|---|---|---|---|---|
+| `gh` | `gh --version` | `brew install gh` | `winget install GitHub.cli` | `apt install gh` or see <https://github.com/cli/cli#installation> |
+| Node.js / `npx` | `npx --version` | `brew install node` | `winget install OpenJS.NodeJS` | `apt install nodejs npm` / use `nvm` |
+| `@playwright/mcp` cache | `npx -y @playwright/mcp --version` (auto-installs first run) | — | — | — |
+
+**Step 0b — Claude Desktop MCP config.**
+
+1. Read the Claude Desktop MCP config:
+   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+   - Linux: `~/.config/Claude/claude_desktop_config.json`
+
+2. Verify **both** `mcpServers.playwright-login` and `mcpServers.playwright-headless` are present, each with:
+   - `command` → **absolute path** to `npx` (macOS / Linux: `which npx`; Windows cmd: `where npx`; PowerShell: `Get-Command npx` — on Windows the executable is `npx.cmd`, not bare `npx`). Bare `"npx"` fails because Claude Desktop launches without a login shell PATH.
+   - `args` starting with `["-y", "@playwright/mcp", ...]`. **Never use `@playwright/mcp@latest`** — Claude Desktop has a lazy-loading race where resolving `@latest` on first call hangs and leaves the server half-initialized. Pin to the bare package name.
+   - **Same** `--user-data-dir` absolute path on both entries — this is what lets the login session from the visible server be reused by the headless server. If the paths diverge, every headless operation starts with no cookies and silently fails.
+   - `playwright-headless` additionally carries `--headless` in its args.
+
+   Expected shape (macOS / Linux example — Windows users substitute `C:\\Users\\<you>\\AppData\\Roaming\\npm\\npx.cmd` for `command` and backslash-escaped Windows paths for `--user-data-dir`):
+   ```json
+   "mcpServers": {
+     "playwright-login": {
+       "command": "/Users/<you>/.nvm/versions/node/<ver>/bin/npx",
+       "args": [
+         "-y", "@playwright/mcp",
+         "--user-data-dir", "/Users/<you>/Library/Application Support/Claude/playwright-session"
+       ]
+     },
+     "playwright-headless": {
+       "command": "/Users/<you>/.nvm/versions/node/<ver>/bin/npx",
+       "args": [
+         "-y", "@playwright/mcp",
+         "--headless",
+         "--user-data-dir", "/Users/<you>/Library/Application Support/Claude/playwright-session"
+       ]
+     }
+   }
+   ```
+
+3. If either entry is missing, uses bare `npx`, uses `@latest`, or the two `--user-data-dir` paths disagree → **STOP and walk the user through fix**:
+   a. Pre-cache the package: `npx -y @playwright/mcp --version`
+   b. Find the absolute npx path: `which npx` (macOS / Linux) / `where npx` (Windows cmd) / `Get-Command npx` (PowerShell)
+   c. Edit the config file above so both `playwright-login` and `playwright-headless` exist with matching `--user-data-dir` (keep other entries intact; Windows JSON strings need double-backslash `\\` path separators)
+   d. **Fully quit Claude Desktop** — macOS: ⌘Q or menu → Quit; Windows: right-click the tray icon → Exit; Linux: close via tray / system menu. Just closing the window is not enough — the app keeps running in the background.
+   e. **Reopen Claude Desktop and start a *new* conversation** — MCP servers are only loaded at conversation start; the existing chat will not pick up config changes
+   f. Ask the user to re-invoke the skill
+
+4. If reasonable → proceed to Phase 1.
 
 ### Phase 1: Check GitHub
 
@@ -140,5 +196,5 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 2. Never fabricate — raw data only.
 3. During init (Step 0), never ask user to choose — just do it. For approval (Step 3), ask in plain text (do NOT use `AskUserQuestion` — its modal UI blocks the draft). For Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
 4. ALL init must complete before ANY fetch.
-5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools.
+5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools. **Use `playwright-login` (visible) only when real user interaction is required — manual login, captcha solving, OA creation form review. Everything else (send email / LINE OA setup / LinkedIn DM / QA chat checks / session verification / Messaging API toggles / token retrieval) runs on `playwright-headless`.** If `playwright-headless` reports the user isn't logged in, hand off to `playwright-login` for that one login, then switch back.
 6. **Always call `browser_close` when done.** Playwright only allows one session at a time — if not closed, other skills cannot use the browser.
