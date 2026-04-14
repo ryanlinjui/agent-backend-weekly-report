@@ -212,37 +212,52 @@ After sending, **offer** the user a scheduled QA loop via **Claude Desktop's bui
 
 ### Scheduling the QA task (runs at the end of each full-report flow)
 
-The skill attempts to set up the schedule **automatically** via `CronCreate`; if that tool isn't available in the current runtime, it falls back to guiding a manual `/schedule` setup. Either way, this runs **only on full-report invocations** (Steps 0→5) and is **idempotent**: re-running `/weekly-report` each week re-installs the schedule fresh instead of stacking duplicates.
+The schedule is installed by delegating to Claude Desktop's built-in **`schedule` skill**, which persists the task as a file at `~/.claude/scheduled-tasks/<task-name>/SKILL.md`. This file is **filesystem-backed**, not session-backed — it survives restarts, Claude Desktop upgrades, and individual conversation lifetimes, and it has **no 7-day auto-expire**. Do NOT use `CronCreate` here: that tool only lives inside the current Claude session (even with `durable: true` it still needs Claude running, and recurring jobs auto-expire after 7 days). We want the file-on-disk variety.
+
+This section runs **only on full-report invocations**. Scheduled QA ticks skip straight to the `QA cycle` section below.
 
 **Step 5.1 — Skip if already scheduled.**
 
-- **Path A (auto, preferred):** call `CronList`. If any entry's `prompt` matches `qa` / `check replies` / `回覆`, the schedule is already live — print `QA already scheduled (every 15m). Re-run /weekly-report weekly to refresh before the 7-day auto-expire.` and return.
-- **Path B (manual fallback):** if `CronList` isn't available, read `config.json` for `qa_schedule_configured: true`. If set, print the same one-liner and return.
+Check `config.json` for `qa_schedule_configured: true`. If set, print a one-liner (e.g. `QA already scheduled as ~/.claude/scheduled-tasks/weekly-report-qa/SKILL.md. Manage it via /schedule.`) and return. This prevents duplicate installs when the user runs `/weekly-report` each week.
 
-**Step 5.2 — Ask the user once.** `AskUserQuestion` with `options: ["Yes, set up QA schedule", "Skip"]`. On `Skip`: write `qa_schedule_configured: false` and end — the skill won't re-ask next run unless the user explicitly flips it back.
+**Step 5.2 — Ask the user once.** `AskUserQuestion` with `options: ["Yes, set up QA schedule", "Skip"]`. On `Skip`: write `qa_schedule_configured: false` and end.
 
-**Step 5.3 — Install the schedule.** On `Yes`:
+**Step 5.3 — Install via the `schedule` skill.** On `Yes`, invoke the `schedule` skill with the `Skill` tool. **The `permission mode: bypass` clause is mandatory — it MUST be in the args string.** Without bypass, every browser tool call during a scheduled tick will wait on an approval prompt, no one is there to click Approve, and the entire QA cycle stalls. Lead the args with it so it can't be missed:
 
-- **Path A — Try `CronCreate` first:**
-  ```
-  CronCreate({
-    cron: "*/15 * * * *",       // every 15 minutes — adjust if user requested a different cadence
-    prompt: "qa",                // hits the QA-cycle-only entry mode
-    recurring: true,
-    durable: true                // persist to .claude/scheduled_tasks.json, survive restarts
-  })
-  ```
-  If this succeeds:
-  - Write `{ "qa_schedule_configured": true, "qa_schedule_interval": "15m", "qa_cron_job_id": <id from CronCreate> }` to `config.json`.
-  - **Tell the user about the 7-day auto-expire.** Recurring `CronCreate` jobs fire one final time after 7 days and then self-delete. Because the full-report flow re-runs this section on the next `/weekly-report` invocation, weekly cadence is a natural refresh — but if the user skips a week they need to re-run `/weekly-report` to reinstall. Surface this clearly.
-  - Done.
+```
+Skill({
+  skill: "schedule",
+  args: "Create a persistent local task named 'weekly-report-qa'. Permission mode: bypass (REQUIRED — do NOT use default / plan / any other mode; the task must run unattended without approval prompts). Schedule: every 15 minutes. Prompt: \"qa\"."
+})
+```
 
-- **Path B — Manual `/schedule` fallback** (Claude Desktop, no `CronCreate`): guide the user through the UI instead:
-  - In a **new conversation** (not this one), type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local Playwright MCP access and this skill's folder).
-  - **Interval** — `15m` (or whatever cadence the user requested).
-  - **Prompt** — one of `"qa"` / `"check replies"` / `"回覆"`.
-  - **Permission mode → `bypass`** — **mandatory.** In any other mode each tool call prompts for approval and the scheduled tick silently stalls with nobody to click Approve. Tell the user why.
-  - Then `AskUserQuestion` with `options: ["Done, task created", "Cancel"]`. Only on `Done`: write `qa_schedule_configured: true` to `config.json`.
+The `schedule` skill (ships with Claude Desktop as `anthropic-skills:schedule`) wraps `mcp__scheduled-tasks__create_scheduled_task` and writes the SKILL.md task file at `~/.claude/scheduled-tasks/weekly-report-qa/SKILL.md`. It returns the task file path on success.
+
+**Step 5.3a — Verify bypass actually stuck.** Read the created task file (`~/.claude/scheduled-tasks/weekly-report-qa/SKILL.md`). Confirm it contains `permission: bypass` (or equivalent — the exact frontmatter key may be `permission_mode` / `permissionMode` depending on the version). If the file does NOT include bypass:
+- Edit the task file's frontmatter to add `permission: bypass`.
+- Re-read to confirm.
+- If editing fails, delete the task and retry Step 5.3 with a louder-worded args string, or fall through to the manual fallback (Step 5.3b).
+
+Only after bypass is verified, write to `config.json` (preserve all other keys):
+
+```json
+{
+  "qa_schedule_configured": true,
+  "qa_schedule_interval": "15m",
+  "qa_schedule_task_name": "weekly-report-qa",
+  "qa_schedule_task_file": "<path returned by schedule skill>"
+}
+```
+
+Then show a final one-liner (`QA scheduled every 15m (bypass mode, persistent). Manage / delete via /schedule or by removing the task file.`) and finish.
+
+**Step 5.3b — If `schedule` skill isn't available** (e.g. older Claude Desktop, skill disabled), fall back to a guided manual setup:
+
+- In a **new conversation**, type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local Playwright MCP access and this skill's folder).
+- **Interval** — `15m` (adjust to what the user asked for).
+- **Prompt** — one of `"qa"` / `"check replies"` / `"回覆"` (these hit the QA-cycle-only entry mode).
+- **Permission mode → `bypass`** — **mandatory.** In any other mode each tool call prompts for approval and the scheduled tick silently stalls.
+- `AskUserQuestion` with `options: ["Done, task created", "Cancel"]`. On `Done`: write `qa_schedule_configured: true` to `config.json`.
 
 ### QA cycle (runs per scheduled tick)
 
