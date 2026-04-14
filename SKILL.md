@@ -111,7 +111,7 @@ On failure:
 |---|---|
 | Email | Read `email_platform` and `email_webmail_url` from `config.json` → Playwright headless → navigate to the saved webmail URL → Compose → fill To / Subject / Body → Send. Agent must adapt its selectors and compose flow to the actual platform. |
 | LINE | `curl -X POST https://api.line.me/v2/bot/message/broadcast -H "Authorization: Bearer {line_channel_access_token}" -H "Content-Type: application/json" -d '{"messages":[...]}'` (token from `config.json`) — broadcast reaches all followers. |
-| LinkedIn | For each recipient: read the template at `scripts/linkedin-dm.js`, substitute `__PROFILE_URL__` and `__MESSAGE__` via `JSON.stringify`, then call `mcp__playwright-login__browser_run_code` with the result. LinkedIn session lives in `playwright-login` (not `playwright-headless` — separate contexts). See [send-linkedin.md](references/send-linkedin.md). |
+| LinkedIn | For each recipient: read the template at `scripts/linkedin-dm.js`, substitute `__PROFILE_URL__` and `__MESSAGE__` via `JSON.stringify`, then call `mcp__playwright-headless__browser_run_code` with the result. **Must be headless** — skill may run as a scheduled task. See [send-linkedin.md](references/send-linkedin.md). |
 
 ## Step 5: Q&A Auto-Check
 

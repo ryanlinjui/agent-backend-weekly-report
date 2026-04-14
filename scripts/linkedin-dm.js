@@ -44,7 +44,16 @@ async (page) => {
     .last()
     .click({ force: true });
 
-  // Give LinkedIn a moment to flush the send before teardown.
+  // Give LinkedIn a moment to flush the send.
   await page.waitForTimeout(1500);
+
+  // Dismiss the compose bubble so subsequent recipients aren't pushed
+  // off-screen. Best-effort — LinkedIn sometimes auto-closes it, in which
+  // case the locator won't match and we just move on.
+  await page
+    .getByRole('button', { name: 'Close your conversation with' })
+    .last()
+    .click({ force: true })
+    .catch(() => {});
 }
 
