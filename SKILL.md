@@ -92,7 +92,7 @@ Follow [references/report-template.md](references/report-template.md). Every ite
 
 > REQUIRES: Step 2 completed (draft ready)
 
-Show draft + recipients. Use `AskUserQuestion` with `options: ["Send", "Edit", "Regenerate", "Cancel"]` so the user gets clickable buttons. **Never auto-send.**
+Show draft + recipients, then ask the user in plain text to reply with one of: `Send`, `Edit`, `Regenerate`, or `Cancel`. **Do NOT use `AskUserQuestion`** — its modal UI blocks the interface and the user cannot see the draft. **Never auto-send.**
 
 ## Step 4: Send
 
@@ -138,7 +138,7 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 
 1. Never send without approval.
 2. Never fabricate — raw data only.
-3. During init (Step 0), never ask user to choose — just do it. For approval (Step 3) and Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
+3. During init (Step 0), never ask user to choose — just do it. For approval (Step 3), ask in plain text (do NOT use `AskUserQuestion` — its modal UI blocks the draft). For Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
 4. ALL init must complete before ANY fetch.
 5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools.
 6. **Always call `browser_close` when done.** Playwright only allows one session at a time — if not closed, other skills cannot use the browser.
