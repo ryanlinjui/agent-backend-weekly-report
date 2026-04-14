@@ -115,7 +115,7 @@ Then add the folder to Claude Code via `/install-skill`, or upload the `.skill` 
 | Command | What it does |
 |---|---|
 | `weekly report` / `週報` | Generate and send the weekly report |
-| `qa` / `check replies` / `回覆` | Start the Q&A monitoring loop |
+| `qa` / `check replies` / `回覆` | Run one QA cycle (check Email + LINE for replies, auto-respond). Use this inside `/schedule` (local task, **permission mode = bypass**) for unattended monitoring. |
 
 ## How It Works
 
@@ -124,7 +124,7 @@ Then add the folder to Claude Code via `/install-skill`, or upload the `.skill` 
 3. **Draft** — Generate the report from the raw data.
 4. **Approval** — Show the draft and ask for approval before sending.
 5. **Send** — Email via `scripts/gmail-send.js` (per-recipient loop, avoids spam heuristics); LINE via `broadcast` API; LinkedIn DMs via `scripts/linkedin-dm.js`.
-6. **Q&A** — Every 15 minutes, check Email and LINE for replies and auto-respond using the report's raw data.
+6. **Q&A** — Run this skill inside a Claude Desktop `/schedule` **local task** (with **permission mode = `bypass`** so tool calls run unattended). Each scheduled tick checks Email and LINE for replies and auto-responds using the report's raw data.
 
 ## Project Structure
 

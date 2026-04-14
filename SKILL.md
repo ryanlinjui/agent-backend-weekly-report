@@ -197,24 +197,41 @@ On failure:
 
 > REQUIRES: Step 4 completed (at least one channel sent successfully)
 
-After sending, offer to start a Q&A monitoring loop that checks for replies every 15 minutes using the `/loop` tool.
+After sending, offer the user a scheduled QA loop via **Claude Desktop's built-in `/schedule` (local task)** — the skill is used as a scheduled task so it can keep replying even when the user isn't at the computer. `/loop` works for an interactive ad-hoc check, but scheduled automation must go through `/schedule`.
 
-**How it works:**
+### Scheduling the QA task
 
-1. Use `/loop 15m` to schedule recurring checks
-2. **QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST run the check scripts for both channels every cycle, then reply via the reply scripts. Do NOT skip either. Scripts are mandatory (Rule 7) and the reply templates return `{ sent: true }` only after the platform confirms delivery (Rule 8). Verify logged-in account before operating each channel (check by email/username/ID, not display name):
-   - **Email (Gmail)**:
-     a. Run `scripts/gmail-qa-check.js` — substitute `__SUBJECT_FILTER__` (e.g. `"Weekly Report"`) and `__NEWER_THAN__` (e.g. `"1d"` for daily loops, `"30m"` for 15-minute loops with buffer). Returns `{ threads: [{ threadId, threadUrl, from, subject, bodyPreview }] }`.
-     b. For each thread that needs a response (use the report's raw data to ground the reply — never fabricate), run `scripts/gmail-qa-reply.js` with `__THREAD_URL__` from step a and the generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
-     c. Non-gmail platforms: fall back to adapting selectors on `email_webmail_url`.
-   - **LINE OA**:
-     a. Run `scripts/line-qa-check.js` with `__ACCOUNT_ID__` from `config.json`. Returns `{ oaUserId, chats: [{ userName, lastMessage, timestamp, chatUrl }] }`.
-     b. For each chat whose `lastMessage` is newer than last cycle's timestamp (track this in memory between loop iterations), run `scripts/line-qa-reply.js` with `__CHAT_URL__` and generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
-     c. **This is mandatory — do NOT skip LINE even if Email had no replies.**
-3. If session expired or wrong account → `browser_close` headless (Rule 6) → switch to `playwright-login` for user to re-login → `browser_close` visible → resume headless
-4. Fallback: Chrome DevTools MCP if Playwright fails
-5. Print summary of questions answered
-6. **Always call `browser_close` after each check cycle**
+Guide the user through creating the task **themselves** (the skill can't create schedule entries programmatically):
+
+1. In any conversation, type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local access to Playwright MCP and this skill's folder).
+2. Fill in:
+   - **Interval** — `15m` (or whatever cadence the user wants).
+   - **Prompt** — something that triggers this skill, e.g. `"qa"` or `"check weekly-report replies"`. The skill's `description` frontmatter already lists these as activation phrases.
+   - **Permission mode → `bypass`** — **this is mandatory, not optional.** In any other mode Claude will prompt for approval on each tool call (browser navigation, `browser_run_code`, etc.), and scheduled runs have nobody there to click Approve. The whole task silently stalls. Explicitly tell the user to pick `bypass` and why.
+3. Confirm the task is saved (it appears in `/schedule`'s task list).
+
+After setup, each scheduled wake-up lands back in this skill with the QA activation phrase. Treat it as a one-shot QA cycle and follow the flow below — no internal `/loop` needed.
+
+### QA cycle (runs per scheduled tick)
+
+**QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST run the check scripts for both channels every cycle, then reply via the reply scripts. Scripts are mandatory (Rule 7); the reply templates return `{ sent: true }` only after the platform confirms delivery (Rule 8). Verify logged-in account before operating each channel (check by email/username/ID, not display name):
+
+- **Email (Gmail)**:
+  a. Run `scripts/gmail-qa-check.js` — substitute `__SUBJECT_FILTER__` (e.g. `"Weekly Report"`) and `__NEWER_THAN__` (e.g. `"1d"` for daily cadence, `"30m"` for 15-minute cadence with buffer). Returns `{ threads: [{ threadId, threadUrl, from, subject, bodyPreview }] }`.
+  b. For each thread that needs a response (use the report's raw data to ground the reply — never fabricate), run `scripts/gmail-qa-reply.js` with `__THREAD_URL__` from step a and the generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
+  c. Non-gmail platforms: fall back to adapting selectors on `email_webmail_url`.
+
+- **LINE OA**:
+  a. Run `scripts/line-qa-check.js` with `__ACCOUNT_ID__` from `config.json`. Returns `{ oaUserId, chats: [{ userName, lastMessage, timestamp, chatUrl }] }`.
+  b. For each chat whose `lastMessage` is newer than the previous tick's timestamp (persist the high-water mark in `config.json` across runs), run `scripts/line-qa-reply.js` with `__CHAT_URL__` and generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
+  c. **Mandatory — do NOT skip LINE even if Email had no replies.**
+
+### Per-cycle housekeeping
+
+- If session expired or wrong account → `browser_close` headless (Rule 6) → switch to `playwright-login` for user to re-login → `browser_close` visible → resume headless. Under `bypass` permission mode there's nobody to click AskUserQuestion, so if a manual login is truly needed the cycle should exit with a clear log and let the next tick retry (the session often self-heals via silent SSO).
+- Fallback: Chrome DevTools MCP if Playwright fails.
+- Print summary of questions answered (even if zero) so the scheduled run log is useful.
+- **Always `browser_close` at the end of the cycle** (Rule 6 — releases the `--user-data-dir` lock for the next tick).
 
 **Reply rules:** Every answer must trace to the report's raw data. Never fabricate.
 
