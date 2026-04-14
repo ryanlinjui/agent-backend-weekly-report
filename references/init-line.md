@@ -9,14 +9,25 @@ Init has two modes. Ask the user up front which one:
 - **A. Create new OA** — run the full flow below (phases 1–5).
 - **B. Reuse existing OA** — ask user to pick one from the OA list on `manager.line.biz`, save its `@accountId`, then **skip to phase 4** (Response settings) and **phase 5** (Token) via `scripts/line-init.js`.
 
-## Phase 0 — LINE Business ID login (visible browser, user operates)
+## Phase 0 — LINE Business ID login
+
+LINE Business ID often **auto-completes SSO silently** when any LINE cookie is still present in the shared `--user-data-dir` (e.g. the user logged in to a different LINE property earlier, or the skill completed Phase 5 on a prior run). Always try the silent path first — visible browser and `AskUserQuestion` only come out when SSO can't resolve on its own.
 
 1. **`browser_close` any active `playwright-headless` session first** (Rule 6 — shared `--user-data-dir` means simultaneous visible + headless clobbers the Chromium lockfile).
-2. Call `playwright-login` `browser_navigate` to `https://manager.line.biz`
-3. Tell the user they need to sign in to LINE Business ID (this single login also authorizes `developers.line.biz` via SSO — see Phase 5). Then block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`. Do NOT poll the page — the user may need to enter 2-step verification codes, wait on email verification, etc. Resume only on `Done`.
-4. After `Done`: snapshot the page to confirm we're on the OA Manager dashboard (not still on a login / 2FA screen). **Then `browser_close` the visible browser** before switching to headless.
 
-Switch to `playwright-headless` for the remaining phases — unless step 2 of Phase 1 hits the reCAPTCHA challenge, in which case close headless first and run the form fill visibly so the user can solve it.
+2. **Try silent SSO in headless.** `playwright-headless` `browser_navigate` to `https://manager.line.biz`:
+   a. If the URL settles on `manager.line.biz/` or `manager.line.biz/account/...` → already logged in. Close headless and proceed to Phase 1.
+   b. If redirected to `account.line.biz/login` → click the `LINE account` button (the LINE-cookie SSO shortcut — same trick `scripts/line-init.js` Phase D and `scripts/line-qa-check.js` use). Wait up to 5 seconds.
+      - If the URL now settles on `manager.line.biz` → silent SSO worked. Close headless and proceed.
+      - If the login page stays (LINE wants QR / password) → fall through to step 3.
+
+3. **Manual login fallback** (only when step 2 didn't resolve):
+   a. `browser_close` the headless session.
+   b. Switch to `playwright-login` and `browser_navigate` to `https://manager.line.biz` (visible).
+   c. Tell the user they need to sign in to LINE Business ID (this single login also authorizes `developers.line.biz` via SSO — see Phase 5). Block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`. Do NOT poll the page — the user may need to enter 2-step verification codes, wait on email verification, etc. Resume only on `Done`.
+   d. Snapshot the page to confirm we're on the OA Manager dashboard (not still on a login / 2FA screen). Then `browser_close` the visible browser.
+
+4. Proceed with `playwright-headless` for the remaining phases — unless Phase 1's entry form hits a reCAPTCHA challenge, in which case close headless first and run the form fill visibly so the user can solve it.
 
 ## Phase 1 — Create new OA (mode A only)
 
