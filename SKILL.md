@@ -202,9 +202,15 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 **How it works:**
 
 1. Use `/loop 15m` to schedule recurring checks
-2. **QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST check both Email and LINE every cycle. Do NOT skip either. Verify logged-in account before operating each channel (check by email/username/ID, not display name. If wrong → log out, re-login via `playwright-login`):
-   - **Email**: `playwright-headless` → navigate to `email_webmail_url` from `config.json` → verify account → search replies to "Weekly Report" subject → read new replies → compose and send response. Agent adapts to the actual platform.
-   - **LINE**: `playwright-headless` → navigate to `https://manager.line.biz` → verify account → go to Chat tab → check for new messages → reply directly in chat. **This is mandatory — do NOT skip LINE even if Email had no replies.**
+2. **QA covers Email and LINE only — LinkedIn is intentionally excluded.** You MUST run the check scripts for both channels every cycle, then reply via the reply scripts. Do NOT skip either. Scripts are mandatory (Rule 7) and the reply templates return `{ sent: true }` only after the platform confirms delivery (Rule 8). Verify logged-in account before operating each channel (check by email/username/ID, not display name):
+   - **Email (Gmail)**:
+     a. Run `scripts/gmail-qa-check.js` — substitute `__SUBJECT_FILTER__` (e.g. `"Weekly Report"`) and `__NEWER_THAN__` (e.g. `"1d"` for daily loops, `"30m"` for 15-minute loops with buffer). Returns `{ threads: [{ threadId, threadUrl, from, subject, bodyPreview }] }`.
+     b. For each thread that needs a response (use the report's raw data to ground the reply — never fabricate), run `scripts/gmail-qa-reply.js` with `__THREAD_URL__` from step a and the generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
+     c. Non-gmail platforms: fall back to adapting selectors on `email_webmail_url`.
+   - **LINE OA**:
+     a. Run `scripts/line-qa-check.js` with `__ACCOUNT_ID__` from `config.json`. Returns `{ oaUserId, chats: [{ userName, lastMessage, timestamp, chatUrl }] }`.
+     b. For each chat whose `lastMessage` is newer than last cycle's timestamp (track this in memory between loop iterations), run `scripts/line-qa-reply.js` with `__CHAT_URL__` and generated `__BODY__`. Verify the return is exactly `{ sent: true }`.
+     c. **This is mandatory — do NOT skip LINE even if Email had no replies.**
 3. If session expired or wrong account → `browser_close` headless (Rule 6) → switch to `playwright-login` for user to re-login → `browser_close` visible → resume headless
 4. Fallback: Chrome DevTools MCP if Playwright fails
 5. Print summary of questions answered
