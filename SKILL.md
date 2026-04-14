@@ -235,7 +235,7 @@ After setup, each scheduled wake-up lands back in this skill with the QA activat
 
 **Reply rules:** Every answer must trace to the report's raw data. Never fabricate.
 
-**The loop continues until the user stops it.** Each cycle is independent — if one channel fails, continue checking others.
+**The `/schedule` task keeps ticking until the user deletes it** from the `/schedule` panel. Each tick is independent — if one channel fails, continue checking the other.
 
 ## Rules
 
@@ -249,5 +249,20 @@ After setup, each scheduled wake-up lands back in this skill with the QA activat
    - About to call a `playwright-headless` tool → first call `mcp__playwright-login__browser_close`.
    - Always `browser_close` the mode you just used before the step ends.
    - **Recovery from a stale lockfile** (crash / interrupted run): `rm -f "<user-data-dir>/SingletonLock" "<user-data-dir>/SingletonCookie" "<user-data-dir>/SingletonSocket"`, then retry. The `--user-data-dir` path is the one configured in `claude_desktop_config.json`.
-7. **Send templates in `scripts/` are mandatory — no inline reimplementation.** For Email (Gmail), LinkedIn DM, and LINE OA init: `Read` the template file, substitute placeholders with `JSON.stringify(value)`, call `mcp__playwright-headless__browser_run_code`. Do not hand-write the compose flow in the current turn — you will miss the quirks the template encodes (hidden textarea labeled "Message Body", compose-bubble stacking, bidi marks in Send label, etc.) and the send will fail silently.
+7. **Every template in `scripts/` is mandatory where it applies — no inline reimplementation.** The full inventory:
+
+   | Script | Step | Use for |
+   |---|---|---|
+   | `scripts/gmail-send.js` | Step 4 | Sending the weekly report per Gmail recipient |
+   | `scripts/gmail-qa-check.js` | Step 5 | Listing unread Gmail replies to reply to |
+   | `scripts/gmail-qa-reply.js` | Step 5 | Replying to a Gmail thread by URL |
+   | `scripts/linkedin-dm.js` | Step 4 | Sending a LinkedIn DM per recipient |
+   | `scripts/line-create-oa-fill.js` | Step 0 Phase 3 | Filling the LINE OA creation form |
+   | `scripts/line-init.js` | Step 0 Phase 3 | Post-creation: TOS agree / enable Messaging API / Response settings / Channel Access Token |
+   | `scripts/line-qa-check.js` | Step 5 | Listing LINE OA chats for reply candidates |
+   | `scripts/line-qa-reply.js` | Step 5 | Replying to a LINE chat by URL |
+
+   Flow for each: `Read` the template file, substitute placeholders with `JSON.stringify(value)`, call `mcp__playwright-headless__browser_run_code`. Do not hand-write the compose / reply / form-fill flow — you will miss the quirks the templates encode (hidden textarea labeled "Message Body", compose-bubble stacking, bidi marks in Send label, Gmail's multi-dialog scoping, LINE's separate session SSO handshake, etc.) and the operation will fail silently. If a template is wrong for the current UI, patch it in `scripts/` and use the patched version — do not bypass.
+
+   Not scripted (intentional): login flows (inherently user-visible, covered by `playwright-login` + `AskUserQuestion`), LINE broadcast in Step 4 (plain `curl` to the Messaging API, no browser needed), and account-identity verification (a single `browser_navigate` + DOM read — too small to template).
 8. **Never claim `sent` without the explicit success signal.** The templates return `{ sent: true }` only after verifying the platform's own confirmation (Gmail "Message sent" toast, LinkedIn compose close, LINE API HTTP 200). If the return value isn't exactly `{ sent: true }` (or for LINE API: HTTP 200 with `{}` body), the send did **not** happen — report FAILED with the actual return / error. "No error was thrown" ≠ sent. The Step 4 final summary table must quote the concrete evidence (the return object or status code) per recipient.
