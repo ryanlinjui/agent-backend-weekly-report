@@ -97,7 +97,7 @@ For each service, navigate with `playwright-headless` first. A previous session 
 **For each service:**
 1. Open the URL with `playwright-headless`
 2. If already logged in → read the account identifier (email, username, account ID — **NEVER rely on display name alone**) → show to user via `AskUserQuestion` with `options: ["Yes, it's mine", "No, wrong account"]`
-3. If wrong account or not logged in → **log out first if needed** → switch to `playwright-login` (visible browser) for user to log in manually → close visible browser
+3. If wrong account or not logged in → **log out first if needed** → switch to `playwright-login` (visible browser) → tell user which site to log in to → **block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`** (do NOT poll the page; the user needs time to complete the flow, and an AskUserQuestion is the clean handoff). After `Done`, re-read the logged-in account identifier to verify it matches expectation, then close the visible browser.
 4. Save verified identity to `config.json`
 
 | Service | URL | Verify by | Done when |
@@ -148,7 +148,22 @@ Follow [references/report-template.md](references/report-template.md). Every ite
 
 > REQUIRES: Step 2 completed (draft ready)
 
-Show draft + recipients, then ask the user in plain text to reply with one of: `Send`, `Edit`, `Regenerate`, or `Cancel`. **Do NOT use `AskUserQuestion`** — its modal UI blocks the interface and the user cannot see the draft. **Never auto-send.**
+Show draft + recipients, then render a **prominent numbered menu** in plain text (user needs to see it at a glance — not buried in prose):
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  👉 請回覆數字選擇下一步：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  **[1] Send**        — 寄出給所有收件人
+  **[2] Edit**        — 我來告訴你要改什麼
+  **[3] Regenerate**  — 重抓資料重新產生草稿
+  **[4] Cancel**      — 取消這次送出
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Adapt the labels to the user's language (`請回覆數字...` for zh-TW, `Reply with a number...` for English, etc.). Accept either the number or the word as input. **Do NOT use `AskUserQuestion`** — its modal UI blocks the interface and the user cannot see the draft. **Never auto-send.**
 
 ## Step 4: Send
 
@@ -194,7 +209,7 @@ After sending, offer to start a Q&A monitoring loop that checks for replies ever
 
 1. Never send without approval.
 2. Never fabricate — raw data only.
-3. During init (Step 0), never ask user to choose — just do it. For approval (Step 3), ask in plain text (do NOT use `AskUserQuestion` — its modal UI blocks the draft). For Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
+3. During init (Step 0), never ask for pure preferences — just do it. Use `AskUserQuestion` only when you need to block on user action: confirming an account identity after a session check, or the login handoff after opening a visible browser (`options: ["Done, I'm logged in", "Cancel"]`). For approval (Step 3), show a numbered plain-text menu — **not** `AskUserQuestion` — so its modal doesn't hide the draft. For Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
 4. ALL init must complete before ANY fetch.
 5. Playwright primary, Chrome DevTools MCP fallback. No other browser tools. **Use `playwright-login` (visible) only when real user interaction is required — manual login, captcha solving, OA creation form review. Everything else (send email / LINE OA setup / LinkedIn DM / QA chat checks / session verification / Messaging API toggles / token retrieval) runs on `playwright-headless`.** If `playwright-headless` reports the user isn't logged in, hand off to `playwright-login` for that one login, then switch back.
 6. **Always call `browser_close` when done.** Playwright only allows one session at a time — if not closed, other skills cannot use the browser.

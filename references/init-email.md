@@ -4,8 +4,8 @@
 
 1. Read `email_platform` and `email_webmail_url` from `config.json` (set during Phase 2)
 2. Call `playwright-login` `browser_navigate` to the saved `email_webmail_url` (visible browser)
-3. User logs in manually
-4. Wait until inbox fully loads — session auto-persists
+3. Tell the user which account to log in with, then block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]` — do NOT poll the page. The user takes as long as they need; the skill resumes only when they click `Done`.
+4. After `Done`: read the inbox page to confirm the logged-in address matches `email_user` (mismatch → log out, repeat step 3). Session auto-persists.
 5. **Close visible browser**
 6. Done — subsequent sends use `playwright-headless` with saved session
 

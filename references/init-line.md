@@ -12,8 +12,8 @@ Init has two modes. Ask the user up front which one:
 ## Phase 0 — LINE Business ID login (visible browser, user operates)
 
 1. Call `playwright-login` `browser_navigate` to `https://manager.line.biz`
-2. User logs in manually to LINE Business ID (this also authorizes `developers.line.biz`)
-3. Close the visible browser after login
+2. Tell the user they need to sign in to LINE Business ID (this single login also authorizes `developers.line.biz` via SSO — see Phase 5). Then block on `AskUserQuestion` with `options: ["Done, I'm logged in", "Cancel"]`. Do NOT poll the page — the user may need to enter 2-step verification codes, wait on email verification, etc. Resume only on `Done`.
+3. After `Done`: snapshot the page to confirm we're on the OA Manager dashboard (not still on a login / 2FA screen). Then close the visible browser.
 
 Switch to `playwright-headless` for the remaining phases — unless step 2 of Phase 1 hits the reCAPTCHA challenge, in which case it must run visibly so the user can solve it.
 
