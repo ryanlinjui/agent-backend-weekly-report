@@ -48,16 +48,18 @@ LINE Business ID often **auto-completes SSO silently** when any LINE cookie is s
 
 ## Phase 1 — Create new OA (mode A only)
 
-Navigate to `https://entry.line.biz/form/entry/unverified` and fill the form via `scripts/line-create-oa-fill.js`:
+Navigate to `https://entry.line.biz/form/entry/unverified` and fill the form via `scripts/line-create-oa-fill.js`.
 
-| Field | Script placeholder | Stable selector |
-|---|---|---|
-| 帳號名稱 (≤ 20 chars) | `__ACCOUNT_NAME__` | `input[name="bot.name"]` |
-| 電子郵件帳號 | `__EMAIL__` | `input[name="account.email"]` |
-| 公司所在國家或地區 | `__COUNTRY__` | `select[name="legalCountryCode"]` |
-| 公司名稱 (≤ 100 chars) | `__COMPANY_NAME__` | `input[name="account.name"]` |
-| 業種大類 | `__INDUSTRY_MAIN__` | `select[name="category_group"]` |
-| 業種小類 | `__INDUSTRY_SUB__` (null = first valid) | `select[name="category"]` |
+**Do NOT ask the user what to fill in.** The agent derives every field from context it already has. Only fall back to asking if a value genuinely can't be derived (e.g. `gh` isn't authenticated so there's no GitHub identity to draw on) — and even then, pick a sensible default first and confirm, don't ask open-ended.
+
+| Field | Script placeholder | Stable selector | How the agent picks it |
+|---|---|---|---|
+| 帳號名稱 (≤ 20 chars) | `__ACCOUNT_NAME__` | `input[name="bot.name"]` | `Weekly Report` as the universal default, or `{email_user local-part} Weekly Report` truncated to 20 chars for a more personal name. This is shown to followers in their chat list. |
+| 電子郵件帳號 | `__EMAIL__` | `input[name="account.email"]` | `email_user` from `config.json` (already captured in Step 0 Phase 2 — don't re-ask). |
+| 公司所在國家或地區 | `__COUNTRY__` | `select[name="legalCountryCode"]` | Auto-detect from OS locale: `defaults read -g AppleLocale` (macOS) / `echo $LANG` (Linux) / `(Get-Culture).Name` (PowerShell). Map the region tag after `_` / `-` to the LINE dropdown label — e.g. `TW` → `台灣`, `US` → `United States`, `JP` → `日本`, `HK` → `香港`. Fall back to `台灣` if detection fails. |
+| 公司名稱 (≤ 100 chars) | `__COMPANY_NAME__` | `input[name="account.name"]` | `gh api user --jq '.name // .login'` — GitHub display name, or login if display name isn't set. Not user-facing; only appears in the provider-selection modal later. |
+| 業種大類 | `__INDUSTRY_MAIN__` | `select[name="category_group"]` | `網站＆部落格` — safe generic pick for a personal weekly-report bot. |
+| 業種小類 | `__INDUSTRY_SUB__` (null = first valid) | `select[name="category"]` | `null` — the script picks the first valid option for you. |
 
 Because reCAPTCHA v3 runs invisibly on this form and can challenge unpredictably, run the fill against the **visible** `weekly-report-login` session:
 

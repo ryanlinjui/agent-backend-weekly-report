@@ -11,7 +11,11 @@
 //     (switch to the `weekly-report-login` headed session so they can see).
 //
 // Usage (from the skill):
-//   1. Read this file, replace placeholders with JSON.stringify(value):
+//   1. Read this file, replace placeholders with JSON.stringify(value).
+//      **The skill derives every value itself — it does NOT ask the user
+//      what to fill in.** See the derivation table in
+//      references/init-line.md > Phase 1 for the exact source of each
+//      value (email_user, gh identity, OS locale, etc.).
 //        __ACCOUNT_NAME__   ≤ 20 chars, displayed in users' chat list
 //        __EMAIL__
 //        __COMPANY_NAME__   ≤ 100 chars
