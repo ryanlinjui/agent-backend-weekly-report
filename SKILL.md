@@ -1,6 +1,6 @@
 ---
 name: weekly-report
-description: Generate and send a weekly report from GitHub, Slack, and Notion. Delivers via Email, LINE, LinkedIn. Includes Q&A auto-check loop. Use when user says "weekly report", "週報", "qa", "check replies", "回覆", or similar.
+description: Generate and send a weekly report from GitHub, Slack, and Notion. Delivers via Email, LINE, LinkedIn. Includes Q&A auto-check loop and optional weekly auto-send. Use when user says "weekly report", "週報", "qa", "check replies", "回覆", "send report", "寄週報", "auto send", or similar.
 ---
 
 # Weekly Report
@@ -13,10 +13,15 @@ Decide which mode based on the user's activation phrase (case- and language-inse
 
 | Phrase (examples) | Mode | What to run |
 |---|---|---|
-| `weekly report`, `週報`, `generate report` | **Full report** | Step 0 → Step 1 → Step 2 → Step 3 → Step 4 → Step 5 (setup offer) |
-| `qa`, `check replies`, `回覆` | **QA cycle only** | Step 0 Phase 0 (CLI verify) → Step 5 `QA cycle` section only. **Skip Steps 1–4** — this entry is for scheduled ticks and ad-hoc reply sweeps, not for producing a new report. |
+| `weekly report`, `週報`, `generate report` | **Full report** | Step 0 → Step 1 → Step 2 → Step 3 → Step 4 → Step 5 (QA schedule offer) → Step 6 (weekly-send schedule offer). Interactive — user present to answer questions and approve. |
+| `qa`, `check replies`, `回覆` | **QA cycle only** | Step 0 Phase 0 (CLI verify) → Step 5 `QA cycle` section only. **Skip Steps 1–4, 6.** This entry is for scheduled ticks and ad-hoc reply sweeps, not for producing a new report. |
+| `send report`, `寄週報`, `auto send` | **Auto-send only** | Step 0 Phase 0 (CLI verify) → Step 1 → Step 2 → Step 4. **Skip Step 3 approval, Steps 5, 6.** This entry is for the weekly `weekly-report-send` scheduled tick — the user's approval was captured once at schedule-setup time (Step 6). Only runs when `config.json` is already populated from a prior full-report run. |
 
-Scheduled `/schedule` tasks always invoke the **QA cycle only** mode (their prompt is one of `qa` / `check replies`). Full-report triggers are expected to be rare (once a week, user-initiated).
+Scheduled `/schedule` tasks always invoke one of the scheduled-only modes:
+- `weekly-report-qa` task (every 15 minutes) → prompt is `qa` / `check replies` → **QA cycle only** mode.
+- `weekly-report-send` task (every Monday 09:00 local) → prompt is `send report` → **Auto-send only** mode.
+
+Interactive `weekly report` triggers are expected to be rare (once when setting up, then occasional manual re-runs if the user wants an off-schedule report).
 
 ## Step 0: Init
 
@@ -272,9 +277,84 @@ Each script goes through the same Read → substitute → Write to `.pw-tmp/` �
 
 **The `/schedule` task keeps ticking until the user deletes it** from the `/schedule` panel. Each tick is independent — if one channel fails, continue checking the other.
 
+## Step 6: Weekly Report Auto-Send
+
+> REQUIRES: Step 5 completed (QA schedule offer shown — accepting or skipping QA is fine; Step 6 is independent).
+
+After the QA offer, **offer** a second scheduled task: weekly auto-send of the full report. Same `/schedule` mechanism, same filesystem-backed persistence, same `permission: bypass` requirement. Unlike the interactive `weekly report` entry, this scheduled task **skips Step 3 approval** because it runs unattended — the user consents once at setup time.
+
+### Scheduling the weekly-send task (runs at the end of each full-report flow)
+
+The schedule is installed the same way as the QA schedule in Step 5: via Claude Desktop's built-in **`schedule` skill**, persisted as `~/.claude/scheduled-tasks/weekly-report-send/SKILL.md`. Filesystem-backed, survives restarts / upgrades / conversation lifetimes, no 7-day expiry. Do NOT use `CronCreate` (session-scoped + 7-day expiry).
+
+This section runs **only on full-report invocations**. Scheduled weekly-send ticks skip straight to the `Auto-send cycle` section below.
+
+**Step 6.1 — Skip if already scheduled.**
+
+Check `config.json` for `weekly_send_schedule_configured: true`. If set, print a one-liner (e.g. `Weekly auto-send already scheduled as ~/.claude/scheduled-tasks/weekly-report-send/SKILL.md. Manage it via /schedule.`) and return. Prevents duplicate installs.
+
+**Step 6.2 — Ask the user once.** `AskUserQuestion` with `options: ["Yes, auto-send weekly", "Skip"]`. On `Skip`: write `weekly_send_schedule_configured: false` and end.
+
+**Step 6.3 — Install via the `schedule` skill.** On `Yes`, invoke the `schedule` skill with the `Skill` tool. **The `permission mode: bypass` clause is mandatory — same reason as QA: unattended sends need unattended tool approval.** Also specify the weekly cadence clearly:
+
+```
+Skill({
+  skill: "schedule",
+  args: "Create a persistent local task named 'weekly-report-send'. Permission mode: bypass (REQUIRED — do NOT use default / plan / any other mode; the task must run unattended without approval prompts). Schedule: every Monday at 09:00 local time. Prompt: \"send report\"."
+})
+```
+
+The `schedule` skill writes the task file at `~/.claude/scheduled-tasks/weekly-report-send/SKILL.md` and returns the path.
+
+**Step 6.3a — Verify bypass actually stuck.** Same pattern as Step 5.3a — read the created task file and confirm it contains `permission: bypass` (or equivalent frontmatter key). If missing, edit the task file to add it, or delete + retry / fall through to the manual fallback (Step 6.3b).
+
+Only after bypass is verified, write to `config.json` (preserve all other keys):
+
+```json
+{
+  "weekly_send_schedule_configured": true,
+  "weekly_send_schedule_cadence": "every Monday 09:00",
+  "weekly_send_schedule_task_name": "weekly-report-send",
+  "weekly_send_schedule_task_file": "<path returned by schedule skill>"
+}
+```
+
+Then show a one-liner (`Weekly auto-send scheduled every Monday 09:00 (bypass mode, persistent). Manage / delete via /schedule or by removing the task file.`) and finish.
+
+**Step 6.3b — If `schedule` skill isn't available**, fall back to guided manual setup:
+
+- In a **new conversation**, type `/schedule` → **+ New task** → **New local task** (NOT remote — the task needs local `playwright-cli` + Bash access and this skill's folder).
+- **Cadence** — `every Monday 09:00` (adjust to what the user asked for, but must be once-weekly to align with the report window).
+- **Prompt** — one of `"send report"` / `"寄週報"` / `"auto send"` (these hit the Auto-send-only entry mode).
+- **Permission mode → `bypass`** — **mandatory.** In any other mode each tool call prompts for approval and the scheduled tick silently stalls.
+- `AskUserQuestion` with `options: ["Done, task created", "Cancel"]`. On `Done`: write `weekly_send_schedule_configured: true` to `config.json`.
+
+### Auto-send cycle (runs per scheduled tick)
+
+**This mode ONLY sends the report. It does nothing else.** No init, no approval prompt, no QA offer, no weekly-send offer.
+
+When the scheduled tick invokes this skill with prompt `"send report"` (or an alias), run in this exact order — stop on first non-recoverable failure:
+
+1. **Step 0 Phase 0 (CLI verify).** If `gh` / `npx` / `playwright-cli` missing, log `"auto-send skipped: CLI tool <name> not installed"` and exit. Next tick retries.
+2. **Pre-flight config check.** Read `config.json`. If ANY of these are missing: `email_user`, `email_platform`, `REPORT_RECIPIENTS`, `line_channel_access_token`, `LINKEDIN_RECIPIENTS` → log `"auto-send skipped: run '週報' interactively first to complete Step 0 init"` and exit. Auto-send assumes a prior interactive run has populated identity + recipients.
+3. **Step 1 — Fetch.** Pull GitHub (always) + Slack / Notion (if their MCPs are connected).
+4. **Step 2 — Draft.** Build the report per `references/report-template.md`.
+5. **SKIP Step 3.** No approval. Consent was captured once at Step 6 setup time. Log the draft to the scheduled run log so there's still a record.
+6. **Step 4 — Send.** Same flow as interactive sends (Gmail per-recipient loop via `scripts/gmail-send.js`, LINE broadcast via `curl`, LinkedIn DMs via `scripts/linkedin-dm.js`). Session-verification rule still applies: open `weekly-report` at each platform, confirm logged-in identity matches `config.json` before sending. If identity mismatched or session expired → log, skip that channel, continue others (don't attempt login via `weekly-report-login` — no user present to click Done).
+7. **SKIP Step 5 and Step 6.** Do NOT offer any scheduling from inside a scheduled tick — those offers are interactive-only.
+8. Print the Step 4 summary table (channel / recipient / status / evidence) to the tick's log.
+9. **`playwright-cli -s=weekly-report close`** at the end (release the `.browser-session/` lock for the next tick — this matters because the QA task at 15-min cadence will be trying to open the same profile).
+
+### Per-tick housekeeping
+
+- Log each tick's outcome explicitly (sent to N recipients, or "skipped: <reason>") so `/schedule` run history is actionable.
+- If a channel needs manual login, log and skip — do NOT switch to `weekly-report-login`. Under `bypass` no one can click Done; the visible browser would hang.
+- Silent SSO often self-heals. The next tick retries automatically.
+- **The `/schedule` task keeps ticking weekly until the user deletes it** from the `/schedule` panel.
+
 ## Rules
 
-1. Never send without approval.
+1. Never send without approval. **Interactive full-report runs** (`weekly report` / `週報`) must complete Step 3's numbered-menu approval before Step 4. **Scheduled auto-send ticks** (`send report` / `寄週報`, triggered by the `weekly-report-send` cron task set up in Step 6) skip Step 3 — the user's approval was captured once when they opted in at Step 6.2. No new per-tick approval; the `permission: bypass` mode on the scheduled task plus the one-time opt-in are together the approval.
 2. Never fabricate — raw data only.
 3. During init (Step 0), never ask for pure preferences — just do it. Use `AskUserQuestion` only when you need to block on user action: confirming an account identity after a session check, or the login handoff after opening a visible browser (`options: ["Done, I'm logged in", "Cancel"]`). For approval (Step 3), show a numbered plain-text menu — **not** `AskUserQuestion` — so its modal doesn't hide the draft. For Q&A offer (Step 5), use `AskUserQuestion` with clickable `options`.
 4. ALL init must complete before ANY fetch.

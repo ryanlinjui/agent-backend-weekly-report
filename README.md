@@ -70,8 +70,9 @@ Then add the folder to Claude Code via `/install-skill`, or upload the `.skill` 
 
 | Command | What it does |
 |---|---|
-| `weekly report` / `週報` | Generate and send the weekly report |
-| `qa` / `check replies` / `回覆` | Run one QA cycle (check Email + LINE for replies, auto-respond). Use this inside `/schedule` (local task, **permission mode = bypass**) for unattended monitoring. |
+| `weekly report` / `週報` | Interactive full run — init / fetch / draft / **approve** / send, then offer to install both the QA and weekly-auto-send schedules. |
+| `qa` / `check replies` / `回覆` | Run one QA cycle (check Email + LINE for replies, auto-respond). Runs inside `/schedule` local task `weekly-report-qa` every 15 min with `permission: bypass`. |
+| `send report` / `寄週報` / `auto send` | Send the weekly report **without any prompts** — no init, no approval, no QA or weekly-send schedule offer. Runs inside `/schedule` local task `weekly-report-send` every Monday 09:00 with `permission: bypass`. Requires a prior interactive `週報` run to populate `config.json`. |
 
 ## How It Works
 
@@ -80,7 +81,8 @@ Then add the folder to Claude Code via `/install-skill`, or upload the `.skill` 
 3. **Draft** — Generate the report from the raw data.
 4. **Approval** — Show the draft and ask for approval before sending.
 5. **Send** — Email via `scripts/gmail-send.js` (per-recipient loop, avoids spam heuristics); LINE via the Messaging API `broadcast` endpoint (`curl`, no browser); LinkedIn DMs via `scripts/linkedin-dm.js`. All browser-scripted sends run on the `weekly-report` headless session.
-6. **Q&A** — Run this skill inside a Claude Desktop `/schedule` **local task** (with **permission mode = `bypass`** so tool calls run unattended). Each scheduled tick checks Email and LINE for replies and auto-responds using the report's raw data.
+6. **Q&A** — Offer to install a `/schedule` **local task** `weekly-report-qa` (every 15 min, `permission: bypass`). Each tick checks Email and LINE for replies and auto-responds using the report's raw data.
+7. **Weekly auto-send** — Offer to install a second `/schedule` local task `weekly-report-send` (every Monday 09:00, `permission: bypass`). Each tick reruns Step 1 → Step 2 → Step 4 only: fetch / draft / send. Skips approval (one-time consent at setup), skips QA, skips offering further schedules. The task file persists on disk at `~/.claude/scheduled-tasks/weekly-report-send/SKILL.md` — survives Claude Desktop restarts and upgrades, no 7-day expiry.
 
 ## Project Structure
 
